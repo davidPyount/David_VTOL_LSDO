@@ -66,7 +66,7 @@ summedCW = csdl.Variable(value = np.zeros((ns-1,3)))
 
 #we want to go through and add all cordwise forces, so a[0][0][1][:] + a[0][0][2][:]
 for i in range(ns-1):
-    for j in range(nc-1):
+    for j in range(nc-1): #THIS IS BROKEN RN FIX THIS LOOK AT SET IN DOCKS
         summedCW = summedCW.set[i,:] += output_vg.surface_panel_forces[0][0][j][i]
 
 ## A FRAME ===============================================================
