@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from . import pintref
+from pintref import u,Q_
 
 g = 32.174 #ft/s^2
 rho = 0.002378 #slug/ft^3
