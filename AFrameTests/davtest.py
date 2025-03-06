@@ -58,23 +58,17 @@ mesh_velocity_list = [mesh_velocity]
 output_vg = vlm_solver(mesh_list, mesh_velocity_list)
 wing_CL = output_vg.surface_CL[0]
 
-print(output_vg.surface_panel_forces[0].value)
-print("Next one")
-print(output_vg.surface_panel_forces[0][0][0][0].value)
-print(np.shape(output_vg.surface_panel_forces))
+
 # print("Lenth")
 # print(len(mesh_list))
-summedCW = np.zeros((ns-1,3))
+summedCW = csdl.Variable(value = np.zeros((ns-1,3)))
 #first is 0?, second is 0?, 3rd is which panel in chord, which panel in span, that is force vector
 
 #we want to go through and add all cordwise forces, so a[0][0][1][:] + a[0][0][2][:]
 for i in range(ns-1):
     for j in range(nc-1):
-        summedCW[i,:] += output_vg.surface_panel_forces[0][0][j][i].value
+        summedCW = summedCW.set[i,:] += output_vg.surface_panel_forces[0][0][j][i]
 
-# summedCW[i,:] += output_vg.surface_panel_forces[0][0][0][i].value + output_vg.surface_panel_forces[0][0][1][i].value
-print("SummedCW")
-print(summedCW)
 ## A FRAME ===============================================================
 # start recorder
 # recorder = csdl.Recorder(inline=True)
