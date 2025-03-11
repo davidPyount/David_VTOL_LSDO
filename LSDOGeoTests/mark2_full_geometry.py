@@ -1,3 +1,9 @@
+# import sys
+# import os
+
+# # Add the directory containing the modules to sys.path
+# sys.path.append(os.path.expanduser("C:/Users/seth3"))
+
 import time
 import lsdo_geo
 import lsdo_function_spaces as lfs
@@ -35,8 +41,8 @@ left_boom_name = 'Left Boom'
 right_boom_name = 'RightBoom'
 
 # Specify the coordinates of the components
-
 # Do the x,y,z need to be incorporate incidence on the wing that results in the TE and LE not being in the same plane?
+# How do we add incidence as a design variable?
 
 x_wing_LE = 0.25
 y_wing_LE = 0
@@ -108,55 +114,45 @@ fl_components = [fl_disk]
 fr_disk = geometry.declare_component(name='fr_disk', function_search_names=[front_right_prop_name])
 fr_components = [fr_disk]
 
+# ? Andrew's code distinguishes between blade disk and each blade but I don't know how to get OpenVSP to export them as 
+# distinct bodies
+
 # Cruise prop
 # cruise_disk = geometry.declare_component(name='cruise_disk', function_search_names=[cruise_prop_name + '-disk'])
-# cruise_disk.plot()
 # cruise_blade_1 = geometry.declare_component(name='cruise_blade_1', function_search_names=[cruise_prop_name + '_blades, 0'])
-# cruise_blade_1.plot()
 # cruise_blade_2 = geometry.declare_component(name='cruise_blade_2', function_search_names=[cruise_prop_name + '_blades, 1'])
-# cruise_blade_2.plot()
 
 # Rotor: rear left
 # rl_disk = geometry.declare_component(name='rl_disk', function_search_names=[rear_left_prop_name + '_disk'])
-# rlo_disk.plot()
 # rl_blade_1 = geometry.declare_component(name='rl_blade_1', function_search_names=[rear_left_prop_name + '_blades, 0'])
-# rlo_blade_1.plot()
 # rl_blade_2 = geometry.declare_component(name='rl_blade_2', function_search_names=[rear_left_prop_name + '_blades, 1'])
 # rl_components = [rl_disk, rl_blade_1, rl_blade_2]
 
 # Rotor: rear right
 # rr_disk = geometry.declare_component(name='rr_disk', function_search_names=[rear_right_prop_name + '_disk'])
-# rri_disk.plot()
 # rr_blade_1 = geometry.declare_component(name='rr_blade_1', function_search_names=[rear_right_prop_name + '_blades, 0'])
-# rri_blade_1.plot()
 # rr_blade_2 = geometry.declare_component(name='rr_blade_2', function_search_names=[rear_right_prop_name + 'blades, 1'])
-# rri_blade_2.plot()
 # rr_components = [rr_disk, rr_blade_1, rr_blade_2]
 
 # Rotor: front left
 # fl_disk = geometry.declare_component(name='fl_disk', function_search_names=[front_left_prop_name + '_disk'])
-# flo_disk.plot()
 # fl_blade_1 = geometry.declare_component(name='fl_blade_1', function_search_names=[front_left_prop_name + '_blades, 0'])
-# flo_blade_1.plot()
 # fl_blade_2 = geometry.declare_component(name='fl_blade_2', function_search_names=[front_left_prop_name + '_blades, 1'])
-# flo_blade_2.plot()
 
 # Rotor: front right
-# fri_disk.plot()
 # fr_blade_1 = geometry.declare_component(name='fr_blade_1', function_search_names=[front_right_prop_name + '_blades, 0'])
-# fri_blade_1.plot()
 # fr_blade_2 = geometry.declare_component(name='fr_blade_2', function_search_names=[front_right_prop_name + '_blades, 1'])
-# fri_blade_2.plot()
 
-lift_rotor_related_components = [rl_components, rr_components, 
-                                 fl_components, fr_components]
+# lift_rotor_related_components = [rl_components, rr_components, fl_components, fr_components]
+lift_rotor_related_components = [rl_disk, rr_disk, fl_disk, fr_disk]
 
 # left boom
 left_boom = geometry.declare_component(name='left_boom', function_search_names=[left_boom_name])
 
 # right boom
-right_boom = geometry.declare_component(name='right_boom', function_search_names=right_boom_name)
+right_boom = geometry.declare_component(name='right_boom', function_search_names=[right_boom_name])
 
+# in the original code this is used only in the lift-rotor rigid body translation 
 boom_components = [left_boom, right_boom]
 
 # endregion
@@ -189,17 +185,13 @@ v_tail_te_left = v_tail.project(np.array([x_v_tail_LE, -y_v_tail_LE, z_v_tail_LE
 v_tail_te_center = v_tail.project(np.array([x_v_tail_LE, 0., z_v_tail_LE]), plot=False)
 v_tail_qc = v_tail.project(np.array([x_v_tail_qc, 0., z_v_tail_LE]), plot=False)
 
-# Do we need these?
-fuselage_wing_qc = fuselage.project(np.array([10.25, 0., 8.5]), plot=False)
-fuselage_wing_te_center = fuselage.project(np.array([14.332, 0., 8.439]), plot=False)
-fuselage_tail_qc = fuselage.project(np.array([24.15, 0., 8.]), plot=False)
-fuselage_tail_te_center = fuselage.project(np.array([31.187, 0., 8.009]), plot=False)
+# Do we need these if we are not changing the fuselage shape?
+# fuselage_wing_qc = fuselage.project(np.array([10.25, 0., 8.5]), plot=False)
+# fuselage_wing_te_center = fuselage.project(np.array([14.332, 0., 8.439]), plot=False)
+# fuselage_tail_qc = fuselage.project(np.array([24.15, 0., 8.]), plot=False)
+# fuselage_tail_te_center = fuselage.project(np.array([31.187, 0., 8.009]), plot=False)
 
 # booms
-# left_boom_front_tip = left_boom.project(np.array([x_boom_front,-y_boom,z_boom]), plot=False)
-# left_boom_rear_tip = left_boom.project(np.array([x_boom_rear,-y_boom,z_boom]), plot=False)
-# right_boom_front_tip = right_boom.project(np.array([x_boom_front,y_boom,z_boom]), plot=False)
-# right_boom_rear_tip = right_boom.project(np.array([x_boom_rear,y_boom,z_boom]), plot=False)
 left_boom_front_tip = np.array([x_boom_front,-y_boom,z_boom])
 left_boom_rear_tip = np.array([x_boom_rear,-y_boom,z_boom])
 right_boom_front_tip = np.array([x_boom_front,y_boom,z_boom])
@@ -234,16 +226,11 @@ wing_boom_rl = wing.project(left_boom_rear_tip)
 wing_boom_rr = wing.project(right_boom_rear_tip)
 
 # Do we need these?
-# fuselage_nose = np.array([2.464, 0., 5.113])
-# fuselage_rear = np.array([31.889, 0., 7.798])
-# fuselage_nose_points_parametric = fuselage.project(fuselage_nose, grid_search_density_parameter=20)
-# fuselage_rear_points_parametric = fuselage.project(fuselage_rear)
-# fuselage_rear_point_on_pusher_disk_parametric = cruise_disk.project(fuselage_rear)
-fuselage_nose = np.array([x_nose_tip, 0., z_nose_tip])
+# fuselage_nose = np.array([x_nose_tip, 0., z_nose_tip])
 fuselage_rear = np.array([0, 0., fuselage_length])
-fuselage_nose_points_parametric = fuselage.project(fuselage_nose, grid_search_density_parameter=20)
+# fuselage_nose_points_parametric = fuselage.project(fuselage_nose, grid_search_density_parameter=20)
 fuselage_rear_points_parametric = fuselage.project(fuselage_rear)
-fuselage_nose_point_on_cruise_propeller_disk_parametric = cruise_disk.project(fuselage_nose)
+# fuselage_nose_point_on_cruise_propeller_disk_parametric = cruise_disk.project(fuselage_nose)
 
 # endregion
 
@@ -268,7 +255,7 @@ rotor_edges = [(rl_disk_y1_para, rl_disk_y2_para), (rl_disk_y1_para, rl_disk_y2_
 wing_num_spanwise_vlm = 23
 wing_num_chordwise_vlm = 5
 
-# Is it OK for the line to be defined using the points I have chosen?
+# Is it OK for the line to be defined using the points I have chosen (1 ft above LE, TE)?
 leading_edge_line_parametric = wing.project(np.linspace(np.array([x_wing_LE, -y_wing_LE, z_wing_LE + 1]), np.array([x_wing_LE, y_wing_LE, z_wing_LE + 1]), wing_num_spanwise_vlm), 
                                  direction=np.array([0., 0., -1.]), grid_search_density_parameter=20.)
 trailing_edge_line_parametric = wing.project(np.linspace(np.array([x_wing_TE, -y_wing_LE, z_wing_LE + 1]), np.array([x_wing_TE, y_wing_LE, z_wing_LE + 1]), wing_num_spanwise_vlm), 
@@ -288,9 +275,9 @@ wing_camber_surface = csdl.linear_combination(upper_surface_wireframe, lower_sur
 # region Htail camber mesh
 h_tail_num_spanwise_vlm = 11
 h_tail_num_chordwise_vlm = 4
-leading_edge_line_parametric = h_tail.project(np.linspace(np.array([x_h_tail_LE, -y_h_tail_LE, z_h_tail_LE]), np.array([x_h_tail_LE, y_h_tail_LE, z_h_tail_LE]), h_tail_num_spanwise_vlm), 
+leading_edge_line_parametric = h_tail.project(np.linspace(np.array([x_h_tail_LE, -y_h_tail_LE, z_h_tail_LE + 1]), np.array([x_h_tail_LE, y_h_tail_LE, z_h_tail_LE + 1]), h_tail_num_spanwise_vlm), 
                                  direction=np.array([0., 0., -1.]), grid_search_density_parameter=20.)
-trailing_edge_line_parametric = h_tail.project(np.linspace(np.array([x_h_tail_TE, -y_h_tail_LE, z_h_tail_LE]), np.array([x_h_tail_TE, -y_h_tail_LE, z_h_tail_LE]), h_tail_num_spanwise_vlm), 
+trailing_edge_line_parametric = h_tail.project(np.linspace(np.array([x_h_tail_TE, -y_h_tail_LE, z_h_tail_LE + 1]), np.array([x_h_tail_TE, -y_h_tail_LE, z_h_tail_LE + 1]), h_tail_num_spanwise_vlm), 
                                   direction=np.array([0., 0., -1.]), grid_search_density_parameter=20.)
 leading_edge_line = geometry.evaluate(leading_edge_line_parametric)
 trailing_edge_line = geometry.evaluate(trailing_edge_line_parametric)
@@ -304,14 +291,15 @@ lower_surface_wireframe = geometry.evaluate(h_tail_lower_surface_wireframe_param
 h_tail_camber_surface = csdl.linear_combination(upper_surface_wireframe, lower_surface_wireframe, 1).reshape((h_tail_num_chordwise_vlm, h_tail_num_spanwise_vlm, 3))
 # endregion Htail camber mesh
 
+# Do we want to create a camber mesh for the v-tail?
+# Why does only the wing get both a camber and a beam mesh? What is a beam mesh?
+
 # region Wing beam mesh
+# What is the purpose of defining the qc, can't you get that from the LE and TE implicitly?
 num_beam_nodes = 13
-# wing_qc_right_physical = np.array([12.617, 25.250, 7.5])
-# wing_qc_left_physical = np.array([12.617, -25.250, 7.5])
-# wing_qc_center_physical = np.array([10.25, 0., 8.5])
-wing_qc_right_physical = np.array([12.517, 25.250, 7.5])
-wing_qc_left_physical = np.array([12.517, -25.250, 7.5])
-wing_qc_center_physical = np.array([10.5, 0., 8.5])
+wing_qc_right_physical = np.array([x_wing_qc, y_wing_LE, z_wing_LE])
+wing_qc_left_physical = np.array([x_wing_qc, -y_wing_LE, z_wing_LE])
+wing_qc_center_physical = np.array([x_wing_qc, 0., z_wing_LE])
 
 left_physical = np.linspace(wing_qc_left_physical, wing_qc_center_physical, num_beam_nodes//2, endpoint=False)
 right_physical = np.linspace(wing_qc_center_physical, wing_qc_right_physical, num_beam_nodes//2+1, endpoint=True)
@@ -344,6 +332,7 @@ parameterization_solver = lsdo_geo.ParameterizationSolver()
 parameterization_design_parameters = lsdo_geo.GeometricVariables()
 
 # region Wing Parameterization setup
+# Why are num_coefficients and degree set to the chosen values?
 wing_ffd_block = lsdo_geo.construct_ffd_block_around_entities(name='wing_ffd_block', entities=wing, num_coefficients=(2,11,2), degree=(1,3,1))
 wing_ffd_block_sectional_parameterization = lsdo_geo.VolumeSectionalParameterization(name='wing_sectional_parameterization',
                                                                             parameterized_points=wing_ffd_block.coefficients,
@@ -406,9 +395,8 @@ parameterization_solver.add_parameter(parameter=h_tail_translation_x_coefficient
 parameterization_solver.add_parameter(parameter=h_tail_translation_z_coefficients)
 # endregion Horizontal Stabilizer setup
 
-# # region Boom setup
-# # Why are num_coefficients and degree set to the chosen values?
-# # How to couple this value to the length of the boom?
+# region Boom setup - - Andrew's code does not do this
+# How to couple the length of the boom to its placement on the wing, and the lift rotors' location?
 # boom_ffd_block = lsdo_geo.construct_ffd_block_around_entities(name='boom_ffd_block', entities=left_boom, num_coefficients=(2,11,2), degree=(1,3,1))
 # boom_ffd_block_sectional_parameterization = lsdo_geo.VolumeSectionalParameterization(name='boom_sectional_parameterization',
 #                                                                             parameterized_points=boom_ffd_block.coefficients,
@@ -438,14 +426,30 @@ parameterization_solver.add_parameter(parameter=h_tail_translation_z_coefficient
 lift_rotor_ffd_blocks = []
 lift_rotor_sectional_parameterizations = []
 lift_rotor_parameterization_b_splines = []
-for i, component_set in enumerate(lift_rotor_related_components):
-    rotor_ffd_block = lsdo_geo.construct_ffd_block_around_entities(name=f'{component_set[0].name[:3]}_rotor_ffd_block', entities=component_set, num_coefficients=(2,2,2), degree=(1,1,1))
-    rotor_ffd_block_sectional_parameterization = lsdo_geo.VolumeSectionalParameterization(name=f'{component_set[0].name[:3]}_rotor_sectional_parameterization',
+# for i, component_set in enumerate(lift_rotor_related_components):
+#     rotor_ffd_block = lsdo_geo.construct_ffd_block_around_entities(name=f'{component_set[0].name[:3]}_rotor_ffd_block', entities=component_set, num_coefficients=(2,2,2), degree=(1,1,1))
+#     rotor_ffd_block_sectional_parameterization = lsdo_geo.VolumeSectionalParameterization(name=f'{component_set[0].name[:3]}_rotor_sectional_parameterization',
+#                                                                                 parameterized_points=rotor_ffd_block.coefficients,
+#                                                                                 principal_parametric_dimension=2)
+    
+#     rotor_stretch_coefficient = csdl.Variable(name=f'{component_set[0].name[:3]}_rotor_stretch_coefficient', shape=(1,), value=0.)
+#     lift_rotor_sectional_stretch_b_spline = lfs.Function(name=f'{component_set[0].name[:3]}_rotor_sectional_stretch_x_b_spline', space=constant_b_spline_curve_1_dof_space,
+#                                                 coefficients=rotor_stretch_coefficient)
+    
+#     lift_rotor_ffd_blocks.append(rotor_ffd_block)
+#     lift_rotor_sectional_parameterizations.append(rotor_ffd_block_sectional_parameterization)
+#     lift_rotor_parameterization_b_splines.append(lift_rotor_sectional_stretch_b_spline)                 
+
+#     parameterization_solver.add_parameter(parameter=rotor_stretch_coefficient)
+
+for i, component in enumerate(lift_rotor_related_components):
+    rotor_ffd_block = lsdo_geo.construct_ffd_block_around_entities(name=f'{component.name}_ffd_block', entities=component, num_coefficients=(2,2,2), degree=(1,1,1))
+    rotor_ffd_block_sectional_parameterization = lsdo_geo.VolumeSectionalParameterization(name=f'{component.name}_rotor_sectional_parameterization',
                                                                                 parameterized_points=rotor_ffd_block.coefficients,
                                                                                 principal_parametric_dimension=2)
     
-    rotor_stretch_coefficient = csdl.Variable(name=f'{component_set[0].name[:3]}_rotor_stretch_coefficient', shape=(1,), value=0.)
-    lift_rotor_sectional_stretch_b_spline = lfs.Function(name=f'{component_set[0].name[:3]}_rotor_sectional_stretch_x_b_spline', space=constant_b_spline_curve_1_dof_space,
+    rotor_stretch_coefficient = csdl.Variable(name=f'{component.name}_rotor_stretch_coefficient', shape=(1,), value=0.)
+    lift_rotor_sectional_stretch_b_spline = lfs.Function(name=f'{component.name}_rotor_sectional_stretch_x_b_spline', space=constant_b_spline_curve_1_dof_space,
                                                 coefficients=rotor_stretch_coefficient)
     
     lift_rotor_ffd_blocks.append(rotor_ffd_block)
@@ -453,6 +457,7 @@ for i, component_set in enumerate(lift_rotor_related_components):
     lift_rotor_parameterization_b_splines.append(lift_rotor_sectional_stretch_b_spline)                 
 
     parameterization_solver.add_parameter(parameter=rotor_stretch_coefficient)
+
 # endregion Lift Rotors setup
 
 # # region Plot parameterization
@@ -561,8 +566,30 @@ h_tail.set_coefficients(coefficients=h_tail_coefficients)
 
 # # endregion
 
+# ? ERROR ON LINE 569 BUT VSCODE SUCKS AND I CAN'T DIAGNOSE
 # region Lift Rotors Parameterization Evaluation for Parameterization Solver
-for i, component_set in enumerate(lift_rotor_related_components):
+# for i, component_set in enumerate(lift_rotor_related_components):
+#     rotor_ffd_block = lift_rotor_ffd_blocks[i]
+#     rotor_ffd_block_sectional_parameterization = lift_rotor_sectional_parameterizations[i]
+#     rotor_stretch_b_spline = lift_rotor_parameterization_b_splines[i]
+
+#     section_parametric_coordinates = np.linspace(0., 1., rotor_ffd_block_sectional_parameterization.num_sections).reshape((-1,1))
+#     sectional_stretch = rotor_stretch_b_spline.evaluate(section_parametric_coordinates)
+
+#     sectional_parameters = lsdo_geo.VolumeSectionalParameterizationInputs(
+#         stretches={0: sectional_stretch, 1:sectional_stretch}
+#     )
+
+#     rotor_ffd_block_coefficients = rotor_ffd_block_sectional_parameterization.evaluate(sectional_parameters, plot=False)
+#     rotor_coefficients = rotor_ffd_block.evaluate(rotor_ffd_block_coefficients, plot=False)
+#     for i, component in enumerate(component_set):
+#         component.set_coefficients(rotor_coefficients[i])
+        # component.set_coefficients(coefficients=rotor_coefficients[i])
+        # ? besides line 498 with the wing, this line is the only instance of set_coefficients where
+        # 'coefficients=' does not precede the argument 
+    # geometry.plot()
+
+for i, component in enumerate(lift_rotor_related_components):
     rotor_ffd_block = lift_rotor_ffd_blocks[i]
     rotor_ffd_block_sectional_parameterization = lift_rotor_sectional_parameterizations[i]
     rotor_stretch_b_spline = lift_rotor_parameterization_b_splines[i]
@@ -576,12 +603,7 @@ for i, component_set in enumerate(lift_rotor_related_components):
 
     rotor_ffd_block_coefficients = rotor_ffd_block_sectional_parameterization.evaluate(sectional_parameters, plot=False)
     rotor_coefficients = rotor_ffd_block.evaluate(rotor_ffd_block_coefficients, plot=False)
-    for i, component in enumerate(component_set):
-        component.set_coefficients(rotor_coefficients[i])
-        # component.set_coefficients(coefficients=rotor_coefficients[i])
-        # ? besides line 498 with the wing, this line is the only instance of set_coefficients where
-        # 'coefficients=' does not precede the argument 
-    # geometry.plot()
+    component.set_coefficients(rotor_coefficients[i])
 
 # endregion Lift Rotors Parameterization Evaluation for Parameterization Solver
 
@@ -674,10 +696,11 @@ tail_moment_arm_computed = csdl.norm(geometry.evaluate(h_tail_qc) - geometry.eva
 tail_moment_arm = csdl.Variable(name='tail_moment_arm', value=np.array([2.125]))
 parameterization_design_parameters.add_variable(computed_value=tail_moment_arm_computed, desired_value=tail_moment_arm)
 
-wing_fuselage_connection = geometry.evaluate(wing_te_center) - geometry.evaluate(fuselage_wing_te_center)
-h_tail_fuselage_connection = geometry.evaluate(h_tail_te_center) - geometry.evaluate(fuselage_tail_te_center)
-parameterization_design_parameters.add_variable(computed_value=wing_fuselage_connection, desired_value=wing_fuselage_connection.value)
-parameterization_design_parameters.add_variable(computed_value=h_tail_fuselage_connection, desired_value=h_tail_fuselage_connection.value)
+# ? Commented out for now but we might add wing placement as a variable
+# wing_fuselage_connection = geometry.evaluate(wing_te_center) - geometry.evaluate(fuselage_wing_te_center)
+# h_tail_fuselage_connection = geometry.evaluate(h_tail_te_center) - geometry.evaluate(fuselage_tail_te_center)
+# parameterization_design_parameters.add_variable(computed_value=wing_fuselage_connection, desired_value=wing_fuselage_connection.value)
+# parameterization_design_parameters.add_variable(computed_value=h_tail_fuselage_connection, desired_value=h_tail_fuselage_connection.value)
 
 # endregion tail moment arm variables
 
@@ -688,12 +711,13 @@ parameterization_design_parameters.add_variable(computed_value=vtail_fuselage_co
 
 # endregion v-tail connection
 
+# ? These values are not being varied
 # region lift + pusher rotor parameterization inputs
 # pusher_fuselage_connection = geometry.evaluate(fuselage_rear_points_parametric) - geometry.evaluate(fuselage_rear_point_on_pusher_disk_parametric)
-cruise_prop_fuselage_connection = geometry.evaluate(fuselage_rear_points_parametric) - geometry.evaluate(fuselage_nose_point_on_cruise_propeller_disk_parametric)
-parameterization_design_parameters.add_variable(computed_value=cruise_prop_fuselage_connection, desired_value=cruise_prop_fuselage_connection.value)
+# cruise_prop_fuselage_connection = geometry.evaluate(fuselage_rear_points_parametric) - geometry.evaluate(fuselage_nose_point_on_cruise_propeller_disk_parametric)
+# parameterization_design_parameters.add_variable(computed_value=cruise_prop_fuselage_connection, desired_value=cruise_prop_fuselage_connection.value)
 
-# These values are not being optimized
+# ? These values are not being varied
 # flo_radius = fro_radius = front_outer_radius = csdl.Variable(name='front_outer_radius', value=10/2)
 # fli_radius = fri_radius = front_inner_radius = csdl.Variable(name='front_inner_radius', value=10/2)
 # rlo_radius = rro_radius = rear_outer_radius = csdl.Variable(name='rear_outer_radius', value=10/2)
