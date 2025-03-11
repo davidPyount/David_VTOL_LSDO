@@ -18,14 +18,14 @@ if frame == 'caddee':
     vnv_scaler = -1.
 
 # grid setup
-ns = 15 #Node numbers
+ns = 16 #Node numbers
 nc = 5
 b = 1.2
 c = 0.2286
 # nc, ns = 11, 15
 
 # generating mesh
-mesh_orig = gen_vlm_mesh(ns, nc, b, c, frame=frame)
+mesh_orig = gen_vlm_mesh(ns, nc, b, c, frame=frame) #Look into editing this
 mesh = np.zeros((num_nodes,) + mesh_orig.shape)
 for i in range(num_nodes):
     mesh[i,:,:,:] = mesh_orig
@@ -95,7 +95,7 @@ beam_1_cs = af.CSTube(radius=beam_1_radius_expanded, thickness=beam_1_thickness)
 
 # create beam 1 with boundary conditions and loads
 beam_1 = af.Beam(name='beam_1', mesh=beam_1_mesh, material=carbon_fiber, cs=beam_1_cs)
-beam_1.fix(node=0)
+beam_1.fix(node=int((num_nodes_1-1)/2))
 beam_1.add_load(beam_1_loads)
 
 # acceleration (optional)
@@ -182,8 +182,8 @@ optimizer.solve()
 optimizer.print_results()
 recorder.execute()
 
-print(cg.value)
-print(beam_1_displacement.value)
+# print(cg.value)
+# print(beam_1_displacement.value)
 
 plt.figure()
 plt.grid()
