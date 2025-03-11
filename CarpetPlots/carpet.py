@@ -39,26 +39,72 @@ plt.axhline(TW_Ciel)
 plt.axvline(WS_stall)
 plt.ylabel("T/W")
 plt.xlabel("W/S")
-plt.legend(["Climb at 10ft/s close to stall speed", "Maneuver at 2g","Ceiling","Stall"])
+plt.legend(["Climb at 10ft/s", "Maneuver at 2g","Ceiling","Stall"])
 plt.title("T/W vs W/S")
 
-nmax = 5
-nmin = -2
-ns = np.linspace(0,6,100)
+#P/W
+T_climb = 8 #Newtons
+V_climb = vcruise #m/s
+P_climb = 152.4 #W
+eta_climb = T_climb*V_climb/P_climb
+print(f"Climb efficiency is {eta_climb}")
+PW_climb = TW_climb*eta_climb
+
+T_man = 3.656 #N
+V_man = vcruise
+P_man = 69.437 #W
+eta_man = T_man*V_man/P_climb
+print(f"Maneuver efficiency is {eta_man}")
+PW_man = TW_Man*eta_man
+plt.figure()
+plt.plot(WS,PW_climb)
+plt.plot(WS,PW_man)
+
+
+
+
 #V-n diagram
-upper = vstall*ns**2
-lower = -1*abs(nmin)*ns**2
+nmaxcritical = 5
+nmax = 5
+nmin = -3
+
+vs = np.linspace(0,35,100)
+upper = (vs/vstall)**2 #This output is ns
+lower = -(vs/vstall)**2 #This output is ns
+vne = 30
+
+SFy = 1.25
+SFu = 1.5
 
 plt.figure()
 ax = plt.gca()
-ax.set_xlim([0, vstall+5])
-ax.set_ylim([-4, 8])
-plt.plot(ns,upper)
-plt.axhline(nmax)
-plt.axhline(nmin)
-plt.axvline(vstall)
-plt.plot(ns,lower)
-plt.ylabel("Load Factor")
-plt.xlabel("Airspeed")
+ax.set_xlim([0, vne+5])
+ax.set_ylim([-6, 8])
+
+idxu = int(np.argwhere(np.diff(np.sign(upper - nmax*SFu))).flatten()[0]) + 1
+upper = upper[:idxu]
+idxl = int(np.argwhere(np.diff(np.sign(lower - nmin*SFu))).flatten()[0]) + 1
+lower = lower[:idxl]
+
+#Corner speed
+idxc = int(np.argwhere(np.diff(np.sign(upper - nmax))).flatten()[0]) + 1
+vcorner = vs[idxc]
+print(f"Corner speed is {vcorner}")
+plt.plot(vs[idxc],upper[idxc],'o')
+
+plt.plot(vs[:idxu],upper,label ="Positive Stall Limit", color = 'b')
+plt.hlines(nmax,23,vne, label ="Max allowable n",color = 'm')
+plt.hlines(nmin,18,vne,label = "Max allowable -n", color = 'g')
+plt.axvline(vne,label = "Never Exceed Speed", color = 'r')
+plt.plot(vs[:idxl],lower,label = "Negative Stall Limit", color = 'c')
+plt.hlines(SFy*nmax,26,vne,label = "Yield Limit Upper", color = 'y')
+plt.hlines(SFu*nmax,28,vne,label = "Ultimate Limit Upper",color = 'r')
+plt.hlines(SFy*nmin,20,vne,label = "Yield Limit Lower", color = 'y')
+plt.hlines(SFu*nmin,22,vne,label = "Ultimate Limit Lower", color = 'r')
+plt.title("Performance Envelope")
+plt.ylabel("Load Factor [g]")
+plt.xlabel("Airspeed [m/s]")
+plt.legend(loc="upper left")
 plt.show()
+
 print("test")
