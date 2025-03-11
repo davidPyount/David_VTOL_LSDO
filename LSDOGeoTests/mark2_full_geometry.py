@@ -17,12 +17,12 @@ import_file_path = 'c:/Users/seth3/David_VTOL_LSDO/LSDOGeoTests/'
 import_file = 'mark2_full_geometry.stp'
 geometry = lg.import_geometry(import_file_path + import_file, parallelize=False)
 
-geometry.plot()
+# geometry.plot()
 
 # Specify the names that are given to each component within OpenVSP
 wing_name = 'Wing'
 h_tail_name = 'HStab'
-v_tail_name = 'Vstab'
+v_tail_name = 'VStab'
 fuselage_name = 'Fuselage'
 nose_name = 'Nosecone'
 cruise_prop_name = 'Main Propeller'
@@ -71,6 +71,11 @@ z_boom = 0.2
 lift_rotor_d = 14/12
 z_lift_rotor = z_boom + 0.1 # approximate
 
+x_nose_tip = -0.5
+z_nose_tip = 0.125
+
+fuselage_length = 1.25
+
 # region Declaring all components
 # Wing, tails, fuselage
 wing = geometry.declare_component(function_search_names=[wing_name], name='wing')
@@ -86,49 +91,62 @@ fuselage = geometry.declare_component(function_search_names=[fuselage_name], nam
 nose_hub = geometry.declare_component(name='nose', function_search_names=[nose_name])
 # nose_hub.plot()
 
+# ? Cannot get OpenVSP stp to export disk and blades separately or distinguish between blades
+
+cruise_disk = geometry.declare_component(name='cruise_disk', function_search_names=[cruise_prop_name])
+cruise_components = [cruise_disk]
+
+rl_disk = geometry.declare_component(name='rl_disk', function_search_names=[rear_left_prop_name])
+rl_components = [rl_disk]
+
+rr_disk = geometry.declare_component(name='rr_disk', function_search_names=[rear_right_prop_name])
+rr_components = [rr_disk]
+
+fl_disk = geometry.declare_component(name='fl_disk', function_search_names=[front_left_prop_name])
+fl_components = [fl_disk]
+
+fr_disk = geometry.declare_component(name='fr_disk', function_search_names=[front_right_prop_name])
+fr_components = [fr_disk]
+
 # Cruise prop
-cruise_disk = geometry.declare_component(name='cruise_disk', function_search_names=[cruise_prop_name + '-disk'])
+# cruise_disk = geometry.declare_component(name='cruise_disk', function_search_names=[cruise_prop_name + '-disk'])
 # cruise_disk.plot()
-cruise_blade_1 = geometry.declare_component(name='cruise_blade_1', function_search_names=[cruise_prop_name + '_blades, 0'])
+# cruise_blade_1 = geometry.declare_component(name='cruise_blade_1', function_search_names=[cruise_prop_name + '_blades, 0'])
 # cruise_blade_1.plot()
-cruise_blade_2 = geometry.declare_component(name='cruise_blade_2', function_search_names=[cruise_prop_name + '_blades, 1'])
+# cruise_blade_2 = geometry.declare_component(name='cruise_blade_2', function_search_names=[cruise_prop_name + '_blades, 1'])
 # cruise_blade_2.plot()
-cruise_components = [cruise_disk, cruise_blade_1, cruise_blade_2]
 
 # Rotor: rear left
-rl_disk = geometry.declare_component(name='rl_disk', function_search_names=[rear_left_prop_name + '_disk'])
+# rl_disk = geometry.declare_component(name='rl_disk', function_search_names=[rear_left_prop_name + '_disk'])
 # rlo_disk.plot()
-rl_blade_1 = geometry.declare_component(name='rl_blade_1', function_search_names=[rear_left_prop_name + '_blades, 0'])
+# rl_blade_1 = geometry.declare_component(name='rl_blade_1', function_search_names=[rear_left_prop_name + '_blades, 0'])
 # rlo_blade_1.plot()
-rl_blade_2 = geometry.declare_component(name='rl_blade_2', function_search_names=[rear_left_prop_name + '_blades, 1'])
-rl_components = [rl_disk, rl_blade_1, rl_blade_2]
+# rl_blade_2 = geometry.declare_component(name='rl_blade_2', function_search_names=[rear_left_prop_name + '_blades, 1'])
+# rl_components = [rl_disk, rl_blade_1, rl_blade_2]
 
 # Rotor: rear right
-rr_disk = geometry.declare_component(name='rr_disk', function_search_names=[rear_right_prop_name + '_disk'])
+# rr_disk = geometry.declare_component(name='rr_disk', function_search_names=[rear_right_prop_name + '_disk'])
 # rri_disk.plot()
-rr_blade_1 = geometry.declare_component(name='rr_blade_1', function_search_names=[rear_right_prop_name + '_blades, 0'])
+# rr_blade_1 = geometry.declare_component(name='rr_blade_1', function_search_names=[rear_right_prop_name + '_blades, 0'])
 # rri_blade_1.plot()
-rr_blade_2 = geometry.declare_component(name='rr_blade_2', function_search_names=[rear_right_prop_name + 'blades, 1'])
+# rr_blade_2 = geometry.declare_component(name='rr_blade_2', function_search_names=[rear_right_prop_name + 'blades, 1'])
 # rri_blade_2.plot()
-rr_components = [rr_disk, rr_blade_1, rr_blade_2]
+# rr_components = [rr_disk, rr_blade_1, rr_blade_2]
 
 # Rotor: front left
-fl_disk = geometry.declare_component(name='fl_disk', function_search_names=[front_left_prop_name + '_disk'])
+# fl_disk = geometry.declare_component(name='fl_disk', function_search_names=[front_left_prop_name + '_disk'])
 # flo_disk.plot()
-fl_blade_1 = geometry.declare_component(name='fl_blade_1', function_search_names=[front_left_prop_name + '_blades, 0'])
+# fl_blade_1 = geometry.declare_component(name='fl_blade_1', function_search_names=[front_left_prop_name + '_blades, 0'])
 # flo_blade_1.plot()
-fl_blade_2 = geometry.declare_component(name='fl_blade_2', function_search_names=[front_left_prop_name + '_blades, 1'])
+# fl_blade_2 = geometry.declare_component(name='fl_blade_2', function_search_names=[front_left_prop_name + '_blades, 1'])
 # flo_blade_2.plot()
-fl_components = [fl_disk, fl_blade_1, fl_blade_2]
 
 # Rotor: front right
-fr_disk = geometry.declare_component(name='fr_disk', function_search_names=[front_right_prop_name + '_disk'])
 # fri_disk.plot()
-fr_blade_1 = geometry.declare_component(name='fr_blade_1', function_search_names=[front_right_prop_name + '_blades, 0'])
+# fr_blade_1 = geometry.declare_component(name='fr_blade_1', function_search_names=[front_right_prop_name + '_blades, 0'])
 # fri_blade_1.plot()
-fr_blade_2 = geometry.declare_component(name='fr_blade_2', function_search_names=[front_right_prop_name + '_blades, 1'])
+# fr_blade_2 = geometry.declare_component(name='fr_blade_2', function_search_names=[front_right_prop_name + '_blades, 1'])
 # fri_blade_2.plot()
-fr_components = [fr_disk, fr_blade_1, fr_blade_2]
 
 lift_rotor_related_components = [rl_components, rr_components, 
                                  fl_components, fr_components]
@@ -145,20 +163,20 @@ boom_components = [left_boom, right_boom]
 
 # region Defining key points
 # wing
-wing_le_left = wing.project(np.array([x_wing_LE, y_wing_LE, z_wing_LE]), plot=False)
-wing_le_right = wing.project(np.array([x_wing_LE, -y_wing_LE, z_wing_LE]), plot=False)
+wing_le_left = wing.project(np.array([x_wing_LE, -y_wing_LE, z_wing_LE]), plot=False)
+wing_le_right = wing.project(np.array([x_wing_LE, y_wing_LE, z_wing_LE]), plot=False)
 wing_le_center = wing.project(np.array([x_wing_LE, 0, z_wing_LE]), plot=False)
-wing_te_right = wing.project(np.array([x_wing_TE, y_wing_LE, z_wing_LE]), plot=False)
 wing_te_left = wing.project(np.array([x_wing_TE, -y_wing_LE, z_wing_LE]), plot=False)
+wing_te_right = wing.project(np.array([x_wing_TE, y_wing_LE, z_wing_LE]), plot=False)
 wing_te_center = wing.project(np.array([x_wing_TE, 0, z_wing_LE]), plot=False)
 wing_qc = wing.project(np.array([x_wing_qc, 0, z_wing_LE]), plot=False)
 
 # h-tail
-h_tail_le_right = h_tail.project(np.array([x_h_tail_LE, y_h_tail_LE, z_h_tail_LE]), plot=False)
 h_tail_le_left = h_tail.project(np.array([x_h_tail_LE, -y_h_tail_LE, z_h_tail_LE]), plot=False)
+h_tail_le_right = h_tail.project(np.array([x_h_tail_LE, y_h_tail_LE, z_h_tail_LE]), plot=False)
 h_tail_le_center = h_tail.project(np.array([x_h_tail_LE, 0., z_h_tail_LE]), plot=False)
-h_tail_te_right = h_tail.project(np.array([x_h_tail_LE, y_h_tail_LE, z_h_tail_LE]), plot=False)
 h_tail_te_left = h_tail.project(np.array([x_h_tail_LE, -y_h_tail_LE, z_h_tail_LE]), plot=False)
+h_tail_te_right = h_tail.project(np.array([x_h_tail_LE, y_h_tail_LE, z_h_tail_LE]), plot=False)
 h_tail_te_center = h_tail.project(np.array([x_h_tail_LE, 0., z_h_tail_LE]), plot=False)
 h_tail_qc = h_tail.project(np.array([x_h_tail_qc, 0., z_h_tail_LE]), plot=False)
 
@@ -178,10 +196,15 @@ fuselage_tail_qc = fuselage.project(np.array([24.15, 0., 8.]), plot=False)
 fuselage_tail_te_center = fuselage.project(np.array([31.187, 0., 8.009]), plot=False)
 
 # booms
-right_boom_front_tip = right_boom.project(np.array([x_boom_front,y_boom,z_boom]), plot=False)
-right_boom_rear_tip = right_boom.project(np.array([x_boom_rear,y_boom,z_boom]), plot=False)
-left_boom_front_tip = left_boom.project(np.array([x_boom_front,-y_boom,z_boom]), plot=False)
-left_boom_rear_tip = left_boom.project(np.array([x_boom_rear,-y_boom,z_boom]), plot=False)
+# left_boom_front_tip = left_boom.project(np.array([x_boom_front,-y_boom,z_boom]), plot=False)
+# left_boom_rear_tip = left_boom.project(np.array([x_boom_rear,-y_boom,z_boom]), plot=False)
+# right_boom_front_tip = right_boom.project(np.array([x_boom_front,y_boom,z_boom]), plot=False)
+# right_boom_rear_tip = right_boom.project(np.array([x_boom_rear,y_boom,z_boom]), plot=False)
+left_boom_front_tip = np.array([x_boom_front,-y_boom,z_boom])
+left_boom_rear_tip = np.array([x_boom_rear,-y_boom,z_boom])
+right_boom_front_tip = np.array([x_boom_front,y_boom,z_boom])
+right_boom_rear_tip = np.array([x_boom_rear,y_boom,z_boom])
+
 
 # currently defining these points in terms of the boom instead of giving them their own values (except z)
 # pt means point?
@@ -211,11 +234,16 @@ wing_boom_rl = wing.project(left_boom_rear_tip)
 wing_boom_rr = wing.project(right_boom_rear_tip)
 
 # Do we need these?
-fuselage_nose = np.array([2.464, 0., 5.113])
-fuselage_rear = np.array([31.889, 0., 7.798])
+# fuselage_nose = np.array([2.464, 0., 5.113])
+# fuselage_rear = np.array([31.889, 0., 7.798])
+# fuselage_nose_points_parametric = fuselage.project(fuselage_nose, grid_search_density_parameter=20)
+# fuselage_rear_points_parametric = fuselage.project(fuselage_rear)
+# fuselage_rear_point_on_pusher_disk_parametric = cruise_disk.project(fuselage_rear)
+fuselage_nose = np.array([x_nose_tip, 0., z_nose_tip])
+fuselage_rear = np.array([0, 0., fuselage_length])
 fuselage_nose_points_parametric = fuselage.project(fuselage_nose, grid_search_density_parameter=20)
-fueslage_rear_points_parametric = fuselage.project(fuselage_rear)
-fuselage_rear_point_on_pusher_disk_parametric = cruise_disk.project(fuselage_rear)
+fuselage_rear_points_parametric = fuselage.project(fuselage_rear)
+fuselage_nose_point_on_cruise_propeller_disk_parametric = cruise_disk.project(fuselage_nose)
 
 # endregion
 
@@ -550,6 +578,9 @@ for i, component_set in enumerate(lift_rotor_related_components):
     rotor_coefficients = rotor_ffd_block.evaluate(rotor_ffd_block_coefficients, plot=False)
     for i, component in enumerate(component_set):
         component.set_coefficients(rotor_coefficients[i])
+        # component.set_coefficients(coefficients=rotor_coefficients[i])
+        # ? besides line 498 with the wing, this line is the only instance of set_coefficients where
+        # 'coefficients=' does not precede the argument 
     # geometry.plot()
 
 # endregion Lift Rotors Parameterization Evaluation for Parameterization Solver
@@ -652,14 +683,15 @@ parameterization_design_parameters.add_variable(computed_value=h_tail_fuselage_c
 
 # region v-tail connection, is this OK?
 vtail_fuselage_connection_point = geometry.evaluate(v_tail.project(np.array([x_v_tail_LE, 0., z_h_tail_LE])))
-vtail_fuselage_connection = geometry.evaluate(fueslage_rear_points_parametric) - vtail_fuselage_connection_point
+vtail_fuselage_connection = geometry.evaluate(fuselage_rear_points_parametric) - vtail_fuselage_connection_point
 parameterization_design_parameters.add_variable(computed_value=vtail_fuselage_connection, desired_value=vtail_fuselage_connection.value)
 
 # endregion v-tail connection
 
 # region lift + pusher rotor parameterization inputs
-pusher_fuselage_connection = geometry.evaluate(fueslage_rear_points_parametric) - geometry.evaluate(fuselage_rear_point_on_pusher_disk_parametric)
-parameterization_design_parameters.add_variable(computed_value=pusher_fuselage_connection, desired_value=pusher_fuselage_connection.value)
+# pusher_fuselage_connection = geometry.evaluate(fuselage_rear_points_parametric) - geometry.evaluate(fuselage_rear_point_on_pusher_disk_parametric)
+cruise_prop_fuselage_connection = geometry.evaluate(fuselage_rear_points_parametric) - geometry.evaluate(fuselage_nose_point_on_cruise_propeller_disk_parametric)
+parameterization_design_parameters.add_variable(computed_value=cruise_prop_fuselage_connection, desired_value=cruise_prop_fuselage_connection.value)
 
 # These values are not being optimized
 # flo_radius = fro_radius = front_outer_radius = csdl.Variable(name='front_outer_radius', value=10/2)

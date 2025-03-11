@@ -18,9 +18,9 @@ if frame == 'caddee':
     vnv_scaler = -1.
 
 # grid setup
-ns = 11 #Node numbers
-nc = 3
-b = 0.6
+ns = 15 #Node numbers
+nc = 5
+b = 1.2
 c = 0.2286
 # nc, ns = 11, 15
 
@@ -58,7 +58,6 @@ mesh_velocity_list = [mesh_velocity]
 output_vg = vlm_solver(mesh_list, mesh_velocity_list)
 wing_CL = output_vg.surface_CL[0]
 
-
 beam_1_loads = csdl.Variable(value = np.zeros((ns-1,6)))
 #first is 0?, second is 0?, 3rd is which panel in chord, which panel in span, that is force vector
 
@@ -66,14 +65,16 @@ beam_1_loads = csdl.Variable(value = np.zeros((ns-1,6)))
 for i in range(ns-1):
     for j in range(nc-1): #THIS IS BROKEN RN FIX THIS LOOK AT SET IN DOCKS
         # summedCW = summedCW.set[i,:] += output_vg.surface_panel_forces[0][0][j][i]
-        beam_1_loads = beam_1_loads.set(csdl.slice[i,0:3], beam_1_loads[i,0:3] + output_vg.surface_panel_forces[0][0][j][i])
+        beam_1_loads = (beam_1_loads.set(csdl.slice[i,0:3], beam_1_loads[i,0:3] + output_vg.surface_panel_forces[0][0][j][i]))
 
+SF = 1.5
+beam_1_loads = 5/2 * beam_1_loads * SF
 ## A FRAME ===============================================================
 
 # create a 1D beam 1 mesh
 #ns = 11, so num_nodes_1 = 10
 num_nodes_1 = ns - 1
-beam_1_mesh = np.zeros((num_nodes_1, nc)) #Something here with nc is causing shape errors if nc isnt 3 :(
+beam_1_mesh = np.zeros((num_nodes_1, 3))
 beam_1_mesh[:, 1] = np.linspace(0, b, num_nodes_1)
 beam_1_mesh = csdl.Variable(value=beam_1_mesh)
 
@@ -86,10 +87,11 @@ sigma_flex_yield = 973e6 # [Pa]
 sigma_allow = sigma_flex_yield/SF
 
 # create cs properties for beam 1
-beam_1_radius = csdl.Variable(value=np.ones(num_nodes_1 - 1) * 0.0127)
-beam_1_radius.set_as_design_variable(lower=1E-3, scaler=1E1)
-beam_1_thickness = csdl.Variable(value=np.ones(num_nodes_1 - 1) * 0.001)
-beam_1_cs = af.CSTube(radius=beam_1_radius, thickness=beam_1_thickness)
+beam_1_radius = csdl.Variable(value=0.005)
+beam_1_radius.set_as_design_variable(lower=0.00238125, scaler=1E2) # min set to 1/8in + 1/16in (thickness of beam) to ensure we have room to route wires
+beam_1_radius_expanded = csdl.expand(beam_1_radius, (num_nodes_1 - 1,))
+beam_1_thickness = csdl.Variable(value=np.ones(num_nodes_1 - 1) * 0.0015875)
+beam_1_cs = af.CSTube(radius=beam_1_radius_expanded, thickness=beam_1_thickness)
 
 # create beam 1 with boundary conditions and loads
 beam_1 = af.Beam(name='beam_1', mesh=beam_1_mesh, material=carbon_fiber, cs=beam_1_cs)
@@ -107,11 +109,11 @@ frame.solve()
 
 # get the displacement
 beam_1_displacement = frame.displacement[beam_1.name]
-# beam_1_stress = frame.compute_stress()[beam_1.name]
+beam_1_stress = frame.compute_stress()[beam_1.name]
 
 # displaced mesh
 beam_1_def_mesh = beam_1_mesh + beam_1_displacement
-beam_1_displacement.set_as_constraint(upper=0.025,lower=-0.025)
+beam_1_displacement.set_as_constraint(upper=b*0.05,lower=-b*0.05)
 # beam_1_stress.set_as_constraint(upper=sigma_allow,lower=-sigma_allow,scaler=1e-8)
 
 # get the cg of the beam
@@ -193,8 +195,10 @@ plt.title('Optimized Beam Displacement')
 
 plt.figure()
 plt.grid()
-plt.plot(np.linspace(0, b, num_nodes_1)[:-1], beam_1_radius.value, color='black', linewidth=2)
-plt.scatter(np.linspace(0, b, num_nodes_1)[:-1], beam_1_radius.value, zorder=10, edgecolor='black', s=50, color='green')
+# plt.plot(np.linspace(0, b, num_nodes_1)[:-1], beam_1_radius.value, color='black', linewidth=2)
+plt.plot(np.linspace(0, b, num_nodes_1)[:-1], beam_1_radius_expanded.value, color='black', linewidth=2)
+# plt.scatter(np.linspace(0, b, num_nodes_1)[:-1], beam_1_radius.value, zorder=10, edgecolor='black', s=50, color='green')
+plt.scatter(np.linspace(0, b, num_nodes_1)[:-1], beam_1_radius_expanded.value, zorder=10, edgecolor='black', s=50, color='green')
 plt.xlabel('beam length (m)')
 plt.ylabel('radius (m)')
 plt.title('Optimized Beam Radius')
