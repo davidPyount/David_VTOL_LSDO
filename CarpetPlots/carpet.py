@@ -6,6 +6,7 @@ path_root = Path(__file__).parents[2]
 sys.path.append(str(path_root))
 from David_VTOL_LSDO.CarpetPlots import pintref
 from math import pi
+from math import sqrt
 print("Wahoo.wav")
 
 clmax = 1.45
@@ -40,23 +41,24 @@ plt.ylabel("T/W")
 plt.xlabel("W/S")
 plt.legend(["Climb at 10ft/s close to stall speed", "Maneuver at 2g","Ceiling","Stall"])
 plt.title("T/W vs W/S")
-plt.show()
 
-array = np.array([
-        [-3.53927E+00,2.96057E-05,-2.63734E+00],
-        [-3.55440E+00,9.24183E-01,-2.60233E+00],
-        [-3.57151E+00,1.88572E+00,-2.56586E+00],
-        [-3.58867E+00,2.84852E+00,-2.52935E+00],
-        [-3.60592E+00,3.81277E+00,-2.49278E+00],
-        [-3.62204E+00,4.77378E+00,-2.45601E+00],
-        [-3.64281E+00,5.73453E+00,-2.41846E+00],
-        [-3.67890E+00,6.69733E+00,-2.38051E+00],
-        [-3.92518E+00,7.69578E+00,-2.32876E+00],
-    ])
+nmax = 5
+nmin = -2
+ns = np.linspace(0,6,100)
+#V-n diagram
+upper = vstall*ns**2
+lower = -1*abs(nmin)*ns**2
 
 plt.figure()
-ax = plt.axes(projection ='3d')
-ax.plot3D(array[:,0],array[:,1],array[:,2])
+ax = plt.gca()
+ax.set_xlim([0, vstall+5])
+ax.set_ylim([-4, 8])
+plt.plot(ns,upper)
+plt.axhline(nmax)
+plt.axhline(nmin)
+plt.axvline(vstall)
+plt.plot(ns,lower)
+plt.ylabel("Load Factor")
+plt.xlabel("Airspeed")
 plt.show()
-
 print("test")
