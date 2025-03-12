@@ -12,13 +12,13 @@ clmax = 1.45
 rho = 1.225414729 #kg/m**3
 vstall = 10.3820976 #m/s
 vcruise = 20.98227588 #m/s
-q = 0.5*rho*vcruise
+q = 0.5*rho*vcruise**2
 cdo = 0.0429
 e = 0.75
 AR = 5.3333
 LDmax = 5.7
 G = 3.048/(vcruise) #m/s corresponds to 10 ft/s
-n = 1.25
+n = 1.5
 
 #Wing loading we chose
 loading = 95 #pascals
@@ -35,6 +35,9 @@ TW_Man = (cdo*q)/(WS) + n**2*(WS)/(pi*e*AR*q)
 #Ceiling
 TW_Ciel = 1/LDmax
 plt.figure()
+ax = plt.gca()
+ax.set_xlim([0, 100])
+ax.set_ylim([0, 2])
 plt.plot(WS,TW_climb,'b')
 plt.plot(WS,TW_Man,'g')
 plt.axhline(TW_Ciel)
@@ -43,6 +46,17 @@ plt.ylabel("T/W")
 plt.xlabel("W/S [Pa]")
 plt.legend(["Climb at 10ft/s", f"Maneuver at {n}g","Ceiling","Stall","Chosen W/S [Pa]"])
 plt.title("T/W vs W/S")
+
+## Ok I need to figure out why the manuever T/W requirement is so high FRFR onggg
+
+# k = 1/(pi*e*AR)
+# TW_Man2 = q*(cdo/WS)+n**2*k*(WS/q)
+# plt.plot(WS,TW_Man2,color = 'r')
+
+# TWmax = 0.8
+# WS_chosen = 95.7 #Pa
+# nmax_2 = (q/(k*WS_chosen)*(TWmax - q*(cdo/WS_chosen)))**2
+# print(f"Max load factor is {nmax_2}")
 
 
 #P/W
@@ -53,13 +67,16 @@ eta_climb = T_climb*V_climb/P_climb
 print(f"Climb efficiency is {eta_climb}")
 PW_climb = TW_climb*(V_climb/eta_climb)/2.20462 #convert to pound
 
-T_man = 3.656 #N
+T_man = 8.031820154 #N
 V_man = vcruise
-P_man = 69.437 #W
+P_man = 152.4 #W
 eta_man = T_man*V_man/P_climb
 print(f"Maneuver efficiency is {eta_man}")
 PW_man = TW_Man*(V_man/eta_man) / 2.20462 #convert to pound
 plt.figure()
+ax = plt.gca()
+ax.set_xlim([0, 100])
+ax.set_ylim([0, 100])
 plt.plot(WS,PW_climb,label = "Climb at 10ft/s")
 plt.plot(WS,PW_man, label = f"Maneuver at {n}g")
 plt.axvline(WS_stall, label = "Stall",color='r')
