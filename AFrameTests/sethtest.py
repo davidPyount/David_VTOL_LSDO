@@ -11,7 +11,7 @@ from VortexAD.core.vlm.vlm_solver import vlm_solver
 frame = 'caddee'
 vnv_scaler =  1.
 num_nodes = 1
-alpha = np.array([1.5,]) * np.pi/180.
+alpha = np.array([10,]) * np.pi/180.
 V_inf = np.array([-21.3, 0., 0.])
 if frame == 'caddee':
     V_inf *= -1.

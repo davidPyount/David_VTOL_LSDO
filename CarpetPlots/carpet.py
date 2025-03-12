@@ -7,7 +7,6 @@ sys.path.append(str(path_root))
 from David_VTOL_LSDO.CarpetPlots import pintref
 from math import pi
 from math import sqrt
-print("Wahoo.wav")
 
 clmax = 1.45
 rho = 1.225414729 #kg/m**3
@@ -19,16 +18,19 @@ e = 0.75
 AR = 5.3333
 LDmax = 5.7
 G = 3.048/(vcruise) #m/s corresponds to 10 ft/s
-n = 2
+n = 1.25
 
-WS_upperlim = 12
-WS = np.linspace(1,WS_upperlim,WS_upperlim-1) #kg/m^3
+#Wing loading we chose
+loading = 95 #pascals
+
+WS_upperlim = 100
+WS = np.linspace(0.5,WS_upperlim,WS_upperlim-1) #kg/m^3
 #Stall
-WS_stall = clmax*0.5*rho*vstall
+WS_stall = clmax*0.5*rho*vstall**2
 #Climb
-TW_climb = (cdo*q)/(WS) + WS/(pi*e*AR*q)+G
+TW_climb = (cdo*q)/(WS) + (WS)/(pi*e*AR*q)+G
 #Maneuver
-TW_Man = (cdo*q)/(WS)+n**2*(WS)/(pi*e*AR*q)
+TW_Man = (cdo*q)/(WS) + n**2*(WS)/(pi*e*AR*q)
 
 #Ceiling
 TW_Ciel = 1/LDmax
@@ -36,11 +38,12 @@ plt.figure()
 plt.plot(WS,TW_climb,'b')
 plt.plot(WS,TW_Man,'g')
 plt.axhline(TW_Ciel)
-plt.axvline(WS_stall)
+plt.axvline(WS_stall,color='r')
 plt.ylabel("T/W")
-plt.xlabel("W/S")
-plt.legend(["Climb at 10ft/s", "Maneuver at 2g","Ceiling","Stall"])
+plt.xlabel("W/S [Pa]")
+plt.legend(["Climb at 10ft/s", f"Maneuver at {n}g","Ceiling","Stall","Chosen W/S [Pa]"])
 plt.title("T/W vs W/S")
+
 
 #P/W
 T_climb = 8 #Newtons
@@ -48,20 +51,22 @@ V_climb = vcruise #m/s
 P_climb = 152.4 #W
 eta_climb = T_climb*V_climb/P_climb
 print(f"Climb efficiency is {eta_climb}")
-PW_climb = TW_climb*eta_climb
+PW_climb = TW_climb*(V_climb/eta_climb)/2.20462 #convert to pound
 
 T_man = 3.656 #N
 V_man = vcruise
 P_man = 69.437 #W
 eta_man = T_man*V_man/P_climb
 print(f"Maneuver efficiency is {eta_man}")
-PW_man = TW_Man*eta_man
+PW_man = TW_Man*(V_man/eta_man) / 2.20462 #convert to pound
 plt.figure()
-plt.plot(WS,PW_climb)
-plt.plot(WS,PW_man)
-
-
-
+plt.plot(WS,PW_climb,label = "Climb at 10ft/s")
+plt.plot(WS,PW_man, label = f"Maneuver at {n}g")
+plt.axvline(WS_stall, label = "Stall",color='r')
+plt.ylabel("P/W [W/lb]")
+plt.xlabel("W/S [Pa]")
+plt.title("Power to Weight Ratio")
+plt.legend()
 
 #V-n diagram
 nmaxcritical = 5
