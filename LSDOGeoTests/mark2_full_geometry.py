@@ -272,9 +272,9 @@ h_tail_camber_surface = csdl.linear_combination(upper_surface_wireframe, lower_s
 v_tail_num_spanwise_vlm = 11
 v_tail_num_chordwise_vlm = 4
 leading_edge_line_parametric = v_tail.project(np.linspace(np.array([x_v_tail_LE - 0.05, 0, z_v_tail_root]), np.array([x_v_tail_LE -0.05, 0, z_v_tail_tip]), v_tail_num_spanwise_vlm), 
-                                 direction=np.array([1., 0., 0.]), grid_search_density_parameter=20.,plot=True)
+                                 direction=np.array([1., 0., 0.]), grid_search_density_parameter=20.,plot=False)
 trailing_edge_line_parametric = v_tail.project(np.linspace(np.array([x_v_tail_TE + 0.05, 0, z_v_tail_root]), np.array([x_v_tail_TE + 0.05, 0, z_v_tail_tip]), v_tail_num_spanwise_vlm), 
-                                  direction=np.array([-1., 0., 0.]), grid_search_density_parameter=20.,plot=True)
+                                  direction=np.array([-1., 0., 0.]), grid_search_density_parameter=20.,plot=False)
 leading_edge_line = geometry.evaluate(leading_edge_line_parametric)
 trailing_edge_line = geometry.evaluate(trailing_edge_line_parametric)
 chord_surface = csdl.linear_combination(leading_edge_line, trailing_edge_line, v_tail_num_chordwise_vlm)
