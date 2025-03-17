@@ -43,7 +43,7 @@ print(f"CLimb Cl is {cl_climb}")
 ## Finding turning performance
 
 #Specify turn radius, and either bank angle (load factor) or rate of turn.
-r = 35 #m
+r = 26.67 #m
 turnChoice = "Specify Bank Angle" #"Specify Omega"
 
 if turnChoice == "Specify Bank Angle":
@@ -79,7 +79,7 @@ print(f"The reported cl is {cl_check}")
 
 P_man2 = 355.5 #[W] Hard to know exactly
 eta_man2 = (TW_Man2*W*V_man2)/P_man2 #Minimizing eta maximises PW, so taking a conservatibe (large) P_man results in conservative PW
-PW_man2 = TW_Man2*(V_man2/eta_man2) / 2.20462
+PW_man2 = TW_Man2/0.008553936
 print(f"Maneuver power efficiency is {eta_man2}.")
 print(f"P/W required for maneuver is {PW_man2} W/lb.")
 
@@ -87,6 +87,7 @@ print(f"P/W required for maneuver is {PW_man2} W/lb.")
 
 #Wing loading we chose
 loading = 95 #pascals
+n_new = 2.25 #########
 
 WS_upperlim = 100
 WS = np.linspace(0.5,WS_upperlim,WS_upperlim-1) #kg/m^3
@@ -107,35 +108,43 @@ plt.plot(WS,TW_climb,'b')
 plt.plot(WS,TW_Man,'g')
 plt.axhline(TW_Ciel)
 plt.axvline(WS_stall,color='r')
+plt.axvline(loading,label = "Design Loading", color = 'c')
+TW_design = 0.506666667
+plt.plot(loading,TW_design,'o')
 plt.ylabel("T/W")
 plt.xlabel("W/S [Pa]")
 n_new = round(n_new,3)
-plt.legend(["Climb at 10ft/s", f"Maneuver at {n_new}g","Ceiling","Stall","Chosen W/S [Pa]"])
+plt.legend(["Climb at 10ft/s", f"Maneuver at {n_new}g","Ceiling","Stall","Design Loading","Design T/W"])
 plt.title("T/W vs W/S")
 
 #P/W Ratio ==============================================================
 
 P_climb = 355.5 #W assuming full throttle
-eta_climb = (T_climb*V_climb)/P_climb
-print(f"Climb efficiency is {eta_climb}")
-PW_climb = TW_climb*(V_climb/eta_climb)/2.20462 #convert to pound
+eta_climb1 = (T_climb*V_climb)/P_climb
+eta_climb = 0.008553936 #lb/W thrust efficiency derived from cobramotors static Grams/W
+print(f"Climb efficiency calculated from the Hwang method is {eta_climb1} compared to {eta_climb}")
+PW_climb = TW_climb/eta_climb
 
 
 P_man = 355.5 #W
 T_man = 13.5 #N
-eta_man = (T_man*V_man2)/P_man
-PW_man = TW_Man*(V_man2/eta_man/2.20462)
-print(f"Maneuver efficiency is {eta_man}")
+eta_man1 = (T_man*V_man2)/P_man
+eta_man = 0.008553936 #lb/W thrust efficiency derived from cobramotors static Grams/W
+PW_man = TW_Man/eta_man
+print(f"Maneuver efficiency calculated from the Hwang method is {eta_man1} compared to {eta_man}")
 plt.figure()
 ax = plt.gca()
 ax.set_xlim([0, 100])
-ax.set_ylim([0, 30])
+ax.set_ylim([0, 100])
 plt.plot(WS,PW_climb,label = "Climb at 10ft/s")
 plt.plot(WS,PW_man, label = f"Maneuver at {n_new}g")
 plt.axvline(WS_stall, label = "Stall",color='r')
+plt.axvline(loading,label = "Design Loading", color = 'c')
+PW_design = 59.25 #W/lb
+plt.plot(loading,PW_design,'o',label = "Design P/W")
 plt.ylabel("P/W [W/lb]")
 plt.xlabel("W/S [Pa]")
-plt.title("Power to Weight Ratio")
+plt.title("P/W vs W/S")
 plt.legend()
 
 
@@ -154,7 +163,7 @@ nmin = -3
 vs = np.linspace(0,35,100)
 upper = (vs/vstall)**2 #This output is ns
 lower = -(vs/vstall)**2 #This output is ns
-vne = 30
+vne = 60
 
 SFy = 1.25
 SFu = 1.5
@@ -190,4 +199,3 @@ plt.xlabel("Airspeed [m/s]")
 plt.legend(loc="upper left")
 plt.show()
 
-print("test")
