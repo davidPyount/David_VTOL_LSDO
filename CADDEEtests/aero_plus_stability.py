@@ -60,6 +60,8 @@ mach =cruise_v/sos
 w_total = 6 * cd.Units.mass.pound_to_kg * 9.81
 w_battery = 0.372 * 9.81
 
+# https://www.dupont.com/content/dam/dupont/amer/us/en/performance-building-solutions/public/documents/en/styrofoam-panel-core-20-xps-pis-43-d100943-enus.pdf
+density_foam = 24 # kg/m3
 
 # import C172 geometry
 mark2_geom = cd.import_geometry("C:/Users/seth3/David_VTOL_LSDO/CADDEEtests/mark2.stp")
@@ -331,10 +333,10 @@ def define_mass_properties(caddee: cd.CADDEE):
     fuel_weight = 0
     battery_weight = csdl.Variable(name="fuel_weight", value=w_battery)
 
-    # ga_aviation_weights = cd.aircraft.models.weights.general_aviation_weights.GeneralAviationWeights(
-    #     design_gross_weight=design_gross_weight,
-    #     dynamic_pressure=dynamic_pressure,
-    # )
+    ga_aviation_weights = cd.aircraft.models.weights.general_aviation_weights.GeneralAviationWeights(
+        design_gross_weight=design_gross_weight,
+        dynamic_pressure=dynamic_pressure,
+    )
 
 # need to get expression for wing weight as function of cross-sectional airfoil area, foam density, and spar radius
 # so this step is probably after wing spar sizing in Aframe
@@ -342,13 +344,13 @@ def define_mass_properties(caddee: cd.CADDEE):
     wing : cd.aircraft.components.Wing = aircraft.comps["wing"]
     wing_center = (wing.LE_center + wing.TE_center) / 2
     wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
-    # wing_mass = ga_aviation_weights.evaluate_wing_weight(
-    #     S_ref=wing.parameters.S_ref,
-    #     fuel_weight=fuel_weight,
-    #     AR=wing.parameters.AR,
-    #     sweep=0., taper_ratio=0.72,
-    #     thickness_to_chord=0.13,
-    # )
+    wing_mass = ga_aviation_weights.evaluate_wing_weight(
+        S_ref=wing.parameters.S_ref,
+        fuel_weight=fuel_weight,
+        AR=wing.parameters.AR,
+        sweep=0., taper_ratio=0.72,
+        thickness_to_chord=0.13,
+    )
     wing.quantities.mass_properties.mass = wing_mass + fuel_weight
     wing.quantities.mass_properties.cg_vector = wing_center
 
