@@ -43,7 +43,7 @@ print(f"CLimb Cl is {cl_climb}")
 ## Finding turning performance
 
 #Specify turn radius, and either bank angle (load factor) or rate of turn.
-r = 26.67 #m
+r = 30.48 #m
 turnChoice = "Specify Bank Angle" #"Specify Omega"
 
 if turnChoice == "Specify Bank Angle":
