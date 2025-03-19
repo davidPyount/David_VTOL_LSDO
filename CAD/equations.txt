@@ -1,4 +1,4 @@
-﻿"span" = 48
+﻿"span"= 48
 "wing_chord"= 9
 "fuse_len"= 15
 "fuse_height"= 5
@@ -7,14 +7,15 @@
 "main_spar_len"= 36
 "x_fuse_to_wing"= 3
 "x_cg_from_le"= 2.25
-"boom_len"= 36
+"boom_len"= 30
 "wing_angle"= 1.5
 "boom_d"= 0.75
-"wing_spar_d"= 0.5
+"wing_spar_d"= 0.375
 "wing_spar_l"= 48
 "wing_spar_spacing"= 1.35
-"wing_mount_l" = 2.5
+"wing_mount_l"= 2.5
 "boom_mount_l"= 1
 "vstab_span"= 6.5
 "hstab_span"= 15.25
 "tail_chord"= 5
+"wing_spar_ID"= 0.25
