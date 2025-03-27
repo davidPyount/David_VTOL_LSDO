@@ -4,7 +4,6 @@ from pathlib import Path
 import sys
 path_root = Path(__file__).parents[2]
 sys.path.append(str(path_root))
-from David_VTOL_LSDO.CarpetPlots import pintref
 from math import pi
 from math import sqrt
 import math as m
