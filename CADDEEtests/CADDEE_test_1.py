@@ -12,7 +12,7 @@ recorder = csdl.Recorder(inline=True, expand_ops=True)
 recorder.start()
 
 # import C172 geometry
-mark2_geom = cd.import_geometry("C:/Users/seth3/David_VTOL_LSDO/LSDOGeoTests/mark2.stp")
+mark2_geom = cd.import_geometry("C:/Users/david/OneDrive - UC San Diego/GitHub/LSDO/David_VTOL_LSDO/CADDEEtests/mark2.stp")
 plotting_elements = mark2_geom.plot(show=False, opacity=0.5, color='#FFCD00')
 
 # make instance of CADDEE class
