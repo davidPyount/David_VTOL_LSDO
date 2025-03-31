@@ -1,0 +1,24 @@
+
+	Solution from Scipy SLSQP:
+	----------------------------------------------------------------------------------------------------
+	Problem                  : induced_drag_minimization
+	Solver                   : scipy-slsqp
+	Success                  : True
+	Message                  : Optimization terminated successfully
+	Status                   : 0
+	Total time               : 54.35735630989075
+	Objective                : 0.00354311672877649
+	Gradient norm            : 0.028478709879358254
+	Total function evals     : 15
+	Total gradient evals     : 14
+	Major iterations         : 14
+	Total callbacks          : 59
+	Reused callbacks         : 0
+	obj callbacks            : 15
+	grad callbacks           : 14
+	hess callbacks           : 0
+	con callbacks            : 16
+	jac callbacks            : 14
+	Optimal variables        : [ 1.         -0.34906585 -0.34906585  0.01979298]
+	Optimal obj. gradient    : [0.00341219 0.01077945 0.0175937  0.01933026]
+	----------------------------------------------------------------------------------------------------
