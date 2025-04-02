@@ -1167,27 +1167,27 @@ def define_plus_3g(plus_3g):
     
     plus_3g_power = {}
 
-    # BEM solver
-    rotor_meshes = mesh_container["rotor_meshes"]
-    pusher_rotor_mesh = rotor_meshes.discretizations["pusher_prop_mesh"]
-    mesh_vel = pusher_rotor_mesh.nodal_velocities
-    plus_3g_rpm = csdl.Variable(name="plus_3g_pusher_rpm", shape=(1, ), value=1883.73389999)
-    plus_3g_rpm.set_as_design_variable(upper=3000, lower=1200, scaler=1e-3)
-    bem_inputs = RotorAnalysisInputs()
-    bem_inputs.ac_states = plus_3g.quantities.ac_states
-    bem_inputs.atmos_states =  plus_3g.quantities.atmos_states
-    bem_inputs.mesh_parameters = pusher_rotor_mesh
-    bem_inputs.mesh_velocity = mesh_vel
-    bem_inputs.rpm = plus_3g_rpm
-    bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
-    bem_outputs = bem_model.evaluate(bem_inputs)
-    plus_3g_power["pusher_prop"] = bem_outputs.total_power
-    plus_3g.quantities.rotor_power_dict = plus_3g_power
+    # # BEM solver
+    # rotor_meshes = mesh_container["rotor_meshes"]
+    # pusher_rotor_mesh = rotor_meshes.discretizations["pusher_prop_mesh"]
+    # mesh_vel = pusher_rotor_mesh.nodal_velocities
+    # plus_3g_rpm = csdl.Variable(name="plus_3g_pusher_rpm", shape=(1, ), value=1883.73389999)
+    # plus_3g_rpm.set_as_design_variable(upper=3000, lower=1200, scaler=1e-3)
+    # bem_inputs = RotorAnalysisInputs()
+    # bem_inputs.ac_states = plus_3g.quantities.ac_states
+    # bem_inputs.atmos_states =  plus_3g.quantities.atmos_states
+    # bem_inputs.mesh_parameters = pusher_rotor_mesh
+    # bem_inputs.mesh_velocity = mesh_vel
+    # bem_inputs.rpm = plus_3g_rpm
+    # bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
+    # bem_outputs = bem_model.evaluate(bem_inputs)
+    # plus_3g_power["pusher_prop"] = bem_outputs.total_power
+    # plus_3g.quantities.rotor_power_dict = plus_3g_power
 
     # total forces and moments
     total_forces_plus_3g, total_moments_plus_3g = plus_3g.assemble_forces_and_moments(
-        aero_propulsive_forces=[vlm_forces, drag_build_up, bem_outputs.forces], 
-        aero_propulsive_moments=[vlm_moments, bem_outputs.moments], 
+        aero_propulsive_forces=[vlm_forces, drag_build_up,], 
+        aero_propulsive_moments=[vlm_moments], 
         load_factor=3,
     )
 
@@ -1330,27 +1330,27 @@ def define_minus_1g(minus_1g):
     
     minus_1g_power = {}
 
-    # BEM solver
-    rotor_meshes = mesh_container["rotor_meshes"]
-    pusher_rotor_mesh = rotor_meshes.discretizations["pusher_prop_mesh"]
-    mesh_vel = pusher_rotor_mesh.nodal_velocities
-    minus_1g_rpm = csdl.Variable(name="minus_1g_pusher_rpm", shape=(1, ), value=2000)
-    minus_1g_rpm.set_as_design_variable(upper=3000, lower=1200, scaler=1e-3)
-    bem_inputs = RotorAnalysisInputs()
-    bem_inputs.ac_states = minus_1g.quantities.ac_states
-    bem_inputs.atmos_states =  minus_1g.quantities.atmos_states
-    bem_inputs.mesh_parameters = pusher_rotor_mesh
-    bem_inputs.mesh_velocity = mesh_vel
-    bem_inputs.rpm = minus_1g_rpm
-    bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
-    bem_outputs = bem_model.evaluate(bem_inputs)
-    minus_1g_power["pusher_prop"] = bem_outputs.total_power
-    minus_1g.quantities.rotor_power_dict = minus_1g_power
+    # # BEM solver
+    # rotor_meshes = mesh_container["rotor_meshes"]
+    # pusher_rotor_mesh = rotor_meshes.discretizations["pusher_prop_mesh"]
+    # mesh_vel = pusher_rotor_mesh.nodal_velocities
+    # minus_1g_rpm = csdl.Variable(name="minus_1g_pusher_rpm", shape=(1, ), value=2000)
+    # minus_1g_rpm.set_as_design_variable(upper=3000, lower=1200, scaler=1e-3)
+    # bem_inputs = RotorAnalysisInputs()
+    # bem_inputs.ac_states = minus_1g.quantities.ac_states
+    # bem_inputs.atmos_states =  minus_1g.quantities.atmos_states
+    # bem_inputs.mesh_parameters = pusher_rotor_mesh
+    # bem_inputs.mesh_velocity = mesh_vel
+    # bem_inputs.rpm = minus_1g_rpm
+    # bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
+    # bem_outputs = bem_model.evaluate(bem_inputs)
+    # minus_1g_power["pusher_prop"] = bem_outputs.total_power
+    # minus_1g.quantities.rotor_power_dict = minus_1g_power
 
     # total forces and moments
     total_forces_minus_1g, total_moments_minus_1g = minus_1g.assemble_forces_and_moments(
-        aero_propulsive_forces=[vlm_forces, drag_build_up, bem_outputs.forces], 
-        aero_propulsive_moments=[vlm_moments, bem_outputs.moments], 
+        aero_propulsive_forces=[vlm_forces, drag_build_up], 
+        aero_propulsive_moments=[vlm_moments], 
         load_factor=-1,
     )
 
