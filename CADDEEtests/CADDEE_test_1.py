@@ -612,77 +612,118 @@ def wing_weight_model(AR,S,m,p,t,spar_outer_diameter):
     return weight
 
 def define_analysis(caddee: cd.CADDEE):
-    # #Below is the more regirmented, ex_lpc.py method of doing analysis
-    # conditions = caddee.conditions
-    # base_config = caddee.base_configuration
-    # base_mps = base_config.system.quantities.mass_properties
+    do_lpc_analysis = True
+    if do_lpc_analysis:
+        # #Below is the more regirmented, ex_lpc.py method of doing analysis
+        conditions = caddee.conditions
+        base_config = caddee.base_configuration
+        base_mps = base_config.system.quantities.mass_properties
 
-    # trim_norm_list = []
+    #Below is the less regimented way of doing analysis from induced drag example.
+    induced_drag_analysis = False
+    if induced_drag_analysis:
 
-    # if do_cruise:
-    #     cruise = conditions["cruise"]
-    #     accel_cruise, total_forces_cruise, total_moments_cruise = define_cruise(cruise)
-    #     if do_trim_optimization:
-    #         trim_norm_list.append(accel_cruise.accel_norm)
+        cruise = caddee.conditions["cruise"]
+        cruise_config = cruise.configuration
+        mesh_container = cruise_config.mesh_container
+        base_config = caddee.base_configuration
+        aircraft = base_config.system
 
+        # Re-evaluate meshes and compute nodal velocities
+        cruise.finalize_meshes()
 
-    # if do_structural_sizing:
-    #     plus_5g = conditions["plus_5g"]
-    #     accel_plus_5g, total_forces_plus_5g, total_moments_plus_5g = define_plus_5g(plus_5g)
+        # Make an instance of an airfoil model
+        nasa_langley_airfoil_maker = ThreeDAirfoilMLModelMaker(
+            airfoil_name="ls417",
+                aoa_range=np.linspace(-12, 16, 50), 
+                reynolds_range=[1000, 1500, 2450, 5450, 10450, 110450, 210450, 310450], 
+                mach_range=[0., 0.01, 0.02, 0.03, 0.04, 0.06],
+        )
+        Cl_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["Cl"])
+
+        vlm_mesh_0 = mesh_container["vlm_mesh_0"]
+        wing_chord_surface = vlm_mesh_0.discretizations["wing_chord_surface"]
+        h_tail_chord_surface = vlm_mesh_0.discretizations["h_tail_chord_surface"]
+
+        lattice_coordinates = [wing_chord_surface.nodal_coordinates, h_tail_chord_surface.nodal_coordinates]
+        lattice_nodal_velocities = [wing_chord_surface.nodal_velocities, h_tail_chord_surface.nodal_velocities]
+
+        vlm_outputs_1 = vlm_solver(
+            lattice_coordinates, 
+            lattice_nodal_velocities, 
+            atmos_states=cruise.quantities.atmos_states,
+            airfoil_Cd_models=[None, None],
+            airfoil_Cl_models=[Cl_model, None],
+            airfoil_Cp_models=[None, None],
+            airfoil_alpha_stall_models=[None, None],
+        )
+
+        # We multiply by (-1) since the lift and drag are w.r.t. the flight-dynamics reference frame
+        total_induced_drag = vlm_outputs_1.total_drag * -1
+        total_lift = vlm_outputs_1.total_lift * -1
         
-    #     minus_3g = conditions["minus_3g"]
-    #     accel_minus_3g, total_forces_minus_3g, total_moments_minus_3g = define_minus_3g(minus_3g)
+        mark2_weight = aircraft.quantities.mass_properties.mass
 
+        lift_constraint = total_lift - mark2_weight
+        lift_constraint.name = "lift_equals_weight_constraint"
+        lift_constraint.set_as_constraint(equals=0., scaler=1e-3)
 
-    #Below is the less regimented way of doing analysis
-    cruise = caddee.conditions["cruise"]
-    cruise_config = cruise.configuration
-    mesh_container = cruise_config.mesh_container
-    base_config = caddee.base_configuration
-    aircraft = base_config.system
+        # set objectives and constraints
+        total_induced_drag.name = "total_induced_drag"
+        total_induced_drag.set_as_objective(scaler=1e-2)
 
-    # Re-evaluate meshes and compute nodal velocities
-    cruise.finalize_meshes()
+        #This is stuff kind of taken from lpc
 
-    # Make an instance of an airfoil model
-    nasa_langley_airfoil_maker = ThreeDAirfoilMLModelMaker(
-        airfoil_name="ls417",
-            aoa_range=np.linspace(-12, 16, 50), 
-            reynolds_range=[1000, 1500, 2450, 5450, 10450, 110450, 210450, 310450], 
-            mach_range=[0., 0.01, 0.02, 0.03, 0.04, 0.06],
-    )
-    Cl_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["Cl"])
+        # if do_cruise:
+        #     cruise = conditions["cruise"]
+        #     accel_cruise, total_forces_cruise, total_moments_cruise = define_cruise(cruise)
 
-    vlm_mesh_0 = mesh_container["vlm_mesh_0"]
-    wing_chord_surface = vlm_mesh_0.discretizations["wing_chord_surface"]
-    h_tail_chord_surface = vlm_mesh_0.discretizations["h_tail_chord_surface"]
+        if do_structural_sizing:
+            plus_5g = conditions["plus_5g"]
+            accel_plus_5g, total_forces_plus_5g, total_moments_plus_5g = define_plus_5g(plus_5g)
+            
+            minus_3g = conditions["minus_3g"]
+            accel_minus_3g, total_forces_minus_3g, total_moments_minus_3g = define_minus_3g(minus_3g)
 
-    lattice_coordinates = [wing_chord_surface.nodal_coordinates, h_tail_chord_surface.nodal_coordinates]
-    lattice_nodal_velocities = [wing_chord_surface.nodal_velocities, h_tail_chord_surface.nodal_velocities]
+        #Now we need to use these total forces, accelerations, and moments to do aframe?
 
-    vlm_outputs_1 = vlm_solver(
-        lattice_coordinates, 
-        lattice_nodal_velocities, 
-        atmos_states=cruise.quantities.atmos_states,
-        airfoil_Cd_models=[None, None],
-        airfoil_Cl_models=[Cl_model, None],
-        airfoil_Cp_models=[None, None],
-        airfoil_alpha_stall_models=[None, None],
-    )
-
-    # We multiply by (-1) since the lift and drag are w.r.t. the flight-dynamics reference frame
-    total_induced_drag = vlm_outputs_1.total_drag * -1
-    total_lift = vlm_outputs_1.total_lift * -1
+    ########### Mission Power Analysis
+    # get rotor power for each conditions
+    # For lpc that comes out of the BEM model, but we don't want to do that.
+    # Can we say cruise power can be whatever it needs to be within a certain range to satisfy lift=weight criteria?
+    # So in lpc the pusher prop rpm is set as a design variable and BEC uses that to get power, 
+    # so I think we can say cruise power is a variable with max power as the limit
     
-    mark2_weight = aircraft.quantities.mass_properties.mass
+    cruise_veloicty = 21.336 #m/s not finalized
+    R = 10e3 #m
+    cruise_time = R/cruise_veloicty #s
 
-    lift_constraint = total_lift - mark2_weight
-    lift_constraint.name = "lift_equals_weight_constraint"
-    lift_constraint.set_as_constraint(equals=0., scaler=1e-3)
+    # cruise
+    cruise = conditions["cruise"]
+    cruise_pusher_rotor_power = csdl.Variable(name="cruise_pusher_power",shape=(1,), value = 223) #W
+    cruise_pusher_rotor_power.set_as_design_variable(upper=355, lower=0, scaler=1e-3) #is this a good scaler?
 
-    # set objectives and constraints
-    total_induced_drag.name = "total_induced_drag"
-    total_induced_drag.set_as_objective(scaler=1e-2)
+    #A lot of this isn't necessary for just cruise power analysis.
+    total_power = csdl.vstack((cruise_pusher_rotor_power)) / 0.95 #effciency factor?
+    mission_time_vec = csdl.vstack((cruise_time))
+    num_nodes = total_power.shape[0]
+    time_vec = csdl.Variable(shape=(num_nodes, ), value=0)
+    cum_sum = 0
+    for i in range(num_nodes):
+        cum_sum = cum_sum + mission_time_vec[i]
+        time_vec = time_vec.set(
+            slices=csdl.slice[i],
+            value=cum_sum 
+        )
+
+    mission_energy_num = csdl.sum(total_power * mission_time_vec) #mission energy constraint
+    mission_energy = csdl.Variable(value = mission_energy_num, lower = 0, upper = 2300) #What units is mission energy in??
+    ER = mission_energy/R #Is this properly a csdl variable?
+
+    ## We have constant mission range. Shoulnd't vortexAD inform power required for cruise at specified velocity?
+
+    #SET AS OBJECTIVVEEEEE
+    ER.set_as_objective()
 
 def define_plus_5g(plus_5g):
     plus_5g_config = plus_5g.configuration
@@ -692,9 +733,13 @@ def define_plus_5g(plus_5g):
     fuselage = aircraft.comps["fuselage"]
     v_tail = aircraft.comps["empennage"].comps["v_tail"]
     rotors = aircraft.comps["rotors"]
-    booms = list(aircraft.comps["booms"].comps.values())
+    boomFR = aircraft.comps["boomFR"]
+    boomBR = aircraft.comps["boomBR"]
+    boomFL = aircraft.comps["boomFL"]
+    boomBL = aircraft.comps["boomBL"]
 
-    # Actuate tail
+
+    # Actuate tail #Do we need to do this, we're not optimizing trim?
     tail = aircraft.comps["empennage"].comps["h_tail"]
     elevator_deflection = csdl.Variable(name="plus_5g_elevator", shape=(1, ), value=0)
     elevator_deflection.set_as_design_variable(lower=np.deg2rad(-20), upper=np.deg2rad(20), scaler=10)
@@ -719,8 +764,8 @@ def define_plus_5g(plus_5g):
     nasa_langley_airfoil_maker = ThreeDAirfoilMLModelMaker(
         airfoil_name="ls417",
             aoa_range=np.linspace(-12, 16, 50), 
-            reynolds_range=[1e5, 2e5, 5e5, 1e6, 2e6, 4e6, 7e6, 10e6], 
-            mach_range=[0., 0.2, 0.3, 0.4, 0.5, 0.6],
+            reynolds_range=[1e5, 2e5, 5e5, 1e6, 2e6, 4e6, 7e6, 10e6],  #update these
+            mach_range=[0., 0.02, 0.03, 0.04, 0.05, 0.06],
     )
     Cl_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["Cl"])
     Cd_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["Cd"])
@@ -805,6 +850,8 @@ def define_plus_5g(plus_5g):
     
     plus_5g_power = {}
 
+    #Not using BEM, we don't need it to be able to sustain a 5g maneuver, just survive it
+
     # # BEM solver
     # rotor_meshes = mesh_container["rotor_meshes"]
     # pusher_rotor_mesh = rotor_meshes.discretizations["pusher_prop_mesh"]
@@ -829,7 +876,7 @@ def define_plus_5g(plus_5g):
         load_factor=3,
     )
 
-    # eom
+    # eomm #now what is this
     eom_model = cd.aircraft.models.eom.SixDofEulerFlatEarthModel()
     accel_plus_5g = eom_model.evaluate(
         total_forces=total_forces_plus_5g,
@@ -842,7 +889,7 @@ def define_plus_5g(plus_5g):
     if do_trim_optimization:
         pass
     else:
-        accel_norm_plus_5g.set_as_constraint(upper=0, lower=0, scaler=4)
+        accel_norm_plus_5g.set_as_constraint(upper=0, lower=0, scaler=4) #is this how we set the strucutral sizing condition?
     
     return accel_plus_5g, total_forces_plus_5g, total_moments_plus_5g
 
