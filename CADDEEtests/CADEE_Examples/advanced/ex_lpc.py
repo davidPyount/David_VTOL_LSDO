@@ -22,28 +22,28 @@ import pickle
 
 print_dvs = True
 
-with open("lpc_dv_dict_full_opt.pickle", "rb") as file:
-    dv_dict_full_opt = pickle.load(file)
+# with open("lpc_dv_dict_full_opt.pickle", "rb") as file:
+#     dv_dict_full_opt = pickle.load(file)
 
-with open("lpc_dv_dict_trim_opt.pickle", "rb") as file:
-    dv_dict_trim_opt = pickle.load(file)
+# with open("lpc_dv_dict_trim_opt.pickle", "rb") as file:
+#     dv_dict_trim_opt = pickle.load(file)
 
-if print_dvs:
-    for key, value in dv_dict_full_opt.items():
-        print(key, value)
-        print("\n")
-    for key, value in dv_dict_trim_opt.items():
-        print(key, value)
-        print("\n")
+# if print_dvs:
+#     for key, value in dv_dict_full_opt.items():
+#         print(key, value)
+#         print("\n")
+#     for key, value in dv_dict_trim_opt.items():
+#         print(key, value)
+#         print("\n")
 
 
-with open("lpc_constraints_dict_full_opt.pickle", "rb") as file:
-    c_dict = pickle.load(file)
+# with open("lpc_constraints_dict_full_opt.pickle", "rb") as file:
+#     c_dict = pickle.load(file)
 
-if print_dvs:
-    for key, value in c_dict.items():
-        print(key, value)
-        print("\n")
+# if print_dvs:
+#     for key, value in c_dict.items():
+#         print(key, value)
+#         print("\n")
 
 max_stress = 350E6 # Pa
 max_displacement = 0.33 # m
@@ -54,11 +54,11 @@ do_qst = False
 vectorize_qst = True
 
 do_hover = True
-do_acoustics = True
+do_acoustics = False
 
 do_cruise = True
-do_climb = True
-do_descent = True
+do_climb = False
+do_descent = False
 
 do_structural_sizing = True
 do_oei = False

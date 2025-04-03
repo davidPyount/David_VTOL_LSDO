@@ -90,14 +90,14 @@ def define_base_config(caddee : cd.CADDEE):
         geometry=wing_geometry
     )
 
-    # Wing material (Make this carbon fiber at some point)
-    aluminum = cd.materials.IsotropicMaterial(name='aluminum', E=69E9, G=26E9, density=2700, nu=0.33)
+    # Wing spar material
+    carbon_fiber = af.Material(name='carbon_fiber', E=96.2E9, G = 3.16E9, density = 1420)
 
     # Function spaces DO WE NEED THESE?
     # Thickness
     thickness_space = wing_geometry.create_parallel_space(lfs.ConstantSpace(2))
     thickness_var, thickness_function = thickness_space.initialize_function(1, value=0.005)
-    wing.quantities.material_properties.set_material(aluminum, thickness=None)
+    wing.quantities.material_properties.set_material(carbon_fiber, thickness=None)
 
     # Pressure space
     pressure_function_space = lfs.IDWFunctionSpace(num_parametric_dimensions=2, order=6, grid_size=(120, 20), conserve=False, n_neighbors=10)
@@ -111,10 +111,8 @@ def define_base_config(caddee : cd.CADDEE):
     # Assign wing component to aircraft
     aircraft.comps["wing"] = wing
 
-    
     # Connect wing to fuselage at the quarter chord
     base_config.connect_component_geometries(fuselage, wing, 0.75 * wing.LE_center + 0.25 * wing.TE_center)
-    base_config.connect_component_geometries(fuselage, h_tail, h_tail.TE_center)
     # base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center)
 
     # Make horizontal tail geometry & component
@@ -126,6 +124,7 @@ def define_base_config(caddee : cd.CADDEE):
 
     # Assign tail component to aircraft
     aircraft.comps["h_tail"] = h_tail
+    #base_config.connect_component_geometries(fuselage, h_tail, h_tail.TE_center) #.TE_Center doesnt work for some reason
 
     # Make vertical tail geometry & component
     v_tail_geometry = aircraft.create_subgeometry(search_names=["VStab"])
@@ -147,10 +146,10 @@ def define_base_config(caddee : cd.CADDEE):
     aircraft.comps["main_spar"] = main_spar
 
 
-    # Connect h-tail to spar?
-    base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center)
-    # Connect v-tail to spar?
-    base_config.connect_component_geometries(main_spar, v_tail, v_tail.TE_center)
+    # # Connect h-tail to spar?
+    # base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center) TE_center doesnt work for some reason
+    # # Connect v-tail to spar?
+    # base_config.connect_component_geometries(main_spar, v_tail, v_tail.TE_center)
 
     #Booms
     #These dont have rotors at the moment. Not sure if we need, not using rotorAD
@@ -210,7 +209,7 @@ def define_base_config(caddee : cd.CADDEE):
 
     #Do we need to do any VLM stuff for drag buildup on the fuselage?
 
-    #I think we need to make a mesh for A-Frame
+    #I think we need to make a mesh for A-Frame? Do that here?
 
     # plot meshes
     mark2_geom.plot_meshes(meshes=[wing_chord_surface.nodal_coordinates.value, tail_chord_surface.nodal_coordinates.value])
@@ -238,361 +237,321 @@ def define_conditions(caddee: cd.CADDEE):
     cruise.configuration = base_config.copy()
     conditions["cruise"] = cruise
 
-    do_struct_sizing = False
+    do_struct_sizing = True
     if do_struct_sizing:
         #+5g
         pitch_angle5g = csdl.Variable(name="5g_pitch",shape=(1,),value=np.deg2rad(10))
         pitch_angle.set_as_design_variable(upper=np.deg2rad(15),lower=0,scaler=10)
         flight_path_angle5g = csdl.Variable(shape=(1,0),value=np.deg2rad(5))
         plus_5g = cd.aircraft.conditions.ClimbCondition(
-            initial_altitiude = 50
-            final_altitude=150
-            pitch_angle=pitch_angle5g
-            fligth_path_angle=flight_path_angle5g
-            mach_number=0.04
-        )
-        plus_5g.configuration = base_config.copy()
-        conditions["plus_5g"] = plus_5g
-
-        #+5g
-        pitch_angle5g = csdl.Variable(name="5g_pitch",shape=(1,),value=np.deg2rad(10))
-        pitch_angle.set_as_design_variable(upper=np.deg2rad(15),lower=0,scaler=10)
-        flight_path_angle5g = csdl.Variable(shape=(1,0),value=np.deg2rad(5))
-        plus_5g = cd.aircraft.conditions.ClimbCondition(
-            initial_altitiude = 50
-            final_altitude=150
-            pitch_angle=pitch_angle5g
-            fligth_path_angle=flight_path_angle5g
-            mach_number=0.04
+            initial_altitiude = 50,
+            final_altitude=150,
+            pitch_angle=pitch_angle5g,
+            fligth_path_angle=flight_path_angle5g,
+            mach_number=0.04,
         )
         plus_5g.configuration = base_config.copy()
         conditions["plus_5g"] = plus_5g
 
         #-3
-        #+5g
         pitch_angle3g = csdl.Variable(name="3g_pitch",shape=(1,),value=np.deg2rad(-8))
-        pitch_angle3g.set_as_design_variable(upper=np.deg2rad(0),lower=-15,scaler=10)
+        pitch_angle3g.set_as_design_variable(upper=0,lower=np.deg2rad(-15),scaler=10)
         flight_path_angle3g = csdl.Variable(shape=(1,0),value=np.deg2rad(-1))
         plus_5g = cd.aircraft.conditions.ClimbCondition(
-            initial_altitiude = 150
-            final_altitude=50
-            pitch_angle=pitch_angle3g
-            fligth_path_angle=flight_path_angle3g
-            mach_number=0.04
+            initial_altitiude = 150,
+            final_altitude=50,
+            pitch_angle=pitch_angle3g,
+            fligth_path_angle=flight_path_angle3g,
+            mach_number=0.04,
         )
         plus_5g.configuration = base_config.copy()
         conditions["minus_3g"] = plus_5g
 
 def define_mass_properties(caddee : cd.CADDEE):
     """Define vehicle-level mass properties of the base configuration."""
-    base_config = caddee.base_configuration
-    conditions = caddee.conditions
+    induced_drag_example = True
+    if induced_drag_example:
+        base_config = caddee.base_configuration
+        conditions = caddee.conditions
 
-    # get some operational variables from the cruise condition
-    cruise = conditions["cruise_1"]
-    fast_cruise = conditions["cruise_2"]
-    rho_imperial = cruise.quantities.atmos_states.density * (1 / units.mass.slug_to_kg) / (1 / units.length.foot_to_m)**3
-    speed_imperial = cruise.parameters.speed * (1 / units.speed.ftps_to_mps)
-    q_cruise = 0.5 * rho_imperial * speed_imperial**2
-    range_imperial = cruise.parameters.range * (1/ units.length.nautical_mile_to_m)
-    max_mach = fast_cruise.parameters.mach_number
-
-    #Access the base config and the its components
-    aircraft = base_config.system
-    airframe = aircraft.comps["airframe"]
-
-    wing = airframe.comps["wing"]
-    fuselage = airframe.comps["fuselage"]
-    h_tail = airframe.comps["h_tail"]
-    v_tail = airframe.comps["v_tail"]
-    #main_landing_gear = airframe.comps["main_landing_gear"]
-    #avionics = fuselage.comps["avionics"]
-    #instruments = fuselage.comps["instruments"]
-    #engine = aircraft.comps["engine"]
-    #fuel = wing.comps["fuel"]
-    payload = fuselage.comps["payload"]
-
-    # design gross weight estimate
-    dg_est = csdl.ImplicitVariable(shape=(1, ), value=6)
-
-    #fuel_weight = csdl.Variable(shape=(1,), value=500)
-    #engine_weight = csdl.Variable(shape=(1,), value=250)
-    payload_weight =  csdl.Variable(shape=(1,), value=0.3)
-
-    #I think add battery weight and make battery CG a design variable to help meet static marge
-    # systems
-    # systems = airframe.comps["systems"]
-    # systems_mass = csdl.Variable(shape=(1, ), value=244)
-    # systems_cg = csdl.Variable(shape=(3, ), value=np.array([-1., 0., -1.5]))
-    # systems.quantities.mass_properties.mass = systems_mass
-    # systems.quantities.mass_properties.cg_vector = systems_cg
-
-    # wing mass
-    ## WRITE CUSTOM WING MASS MODEL AS FUNCTION OF CSDL VARIABLES ()
-    S_ref=wing.parameters.S_ref
-    AR=wing.parameters.AR
-
-    spar_OD = 0.5 #??? I think I need to make a spar componet in CADDEE first?
-    wing_weight = wing_weight_model(AR,S_ref,4,4,12,spar_OD)
-
-    # fuselage mass CONST
-    fuselage_weight = 3
-
-    # h tail mass
-    h_tail_weight_inputs = GAHorizontalTailInputs(
-        S_ref=h_tail.parameters.S_ref,
-        W_gross_design=dg_est,
-        q_cruise=q_cruise,
-    )
-    h_tail_weight_model = GAHorizontalTailWeigthModel()
-    h_tail_weight = h_tail_weight_model.evaluate(h_tail_weight_inputs)
-
-    # v tail mass
-    v_tail_weight_inputs = GAVerticalTailInputs(
-        S_ref=v_tail.parameters.S_ref,
-        AR=v_tail.parameters.AR,
-        W_gross_design=dg_est,
-        q_cruise=q_cruise,
-        t_o_c=0.12,
-        sweep_c4=np.deg2rad(30),
-    )
-    v_tail_weight_model = GAVerticalTailWeigthModel()
-    v_tail_weight = v_tail_weight_model.evaluate(v_tail_weight_inputs)
-
-    # avionics mass CONST
-    avionics_weight = 1
-
-    # instruments mass CONST
-    instruments_weight = 0.5
-
-    # Landing gear mass CONST
-    landing_gear_weight = 0.2    
-
-    #You should probably find a more accurate CG for these things
-
-    wing.quantities.mass_properties.mass = wing_weight * units.mass.pound_to_kg
-    wing.quantities.mass_properties.cg_vector = np.array([9.649 * units.length.foot_to_m, 0. , 2. * units.length.foot_to_m])
-
-    fuselage.quantities.mass_properties.mass = fuselage_weight * units.mass.pound_to_kg
-    fuselage.quantities.mass_properties.cg_vector = np.array([9.649 * units.length.foot_to_m, 0. , 0.])
-
-    h_tail.quantities.mass_properties.mass = h_tail_weight * units.mass.pound_to_kg
-    h_tail.quantities.mass_properties.cg_vector = np.array([25.137 * units.length.foot_to_m, 0., 0.051 * units.length.foot_to_m])
-
-    v_tail.quantities.mass_properties.mass = h_tail_weight * units.mass.pound_to_kg
-    v_tail.quantities.mass_properties.cg_vector = np.array([25.137 * units.length.foot_to_m, 0., 1.51 * units.length.foot_to_m])
-
-    payload.quantities.mass_properties.mass = payload_weight * units.mass.pound_to_kg
-    payload.quantities.mass_properties.cg_vector = np.array([9.649 * units.length.foot_to_m, 0. , 0.75 * units.length.foot_to_m])
-
-    weights_solver = cd.aircraft.models.weights.WeightsSolverModel()
-    weights_solver.evaluate(
-        dg_est, wing_weight, fuselage_weight, h_tail_weight, v_tail_weight, avionics_weight, instruments_weight, engine_weight, fuel_weight, payload_weight, landing_gear_weight
-    )
-    base_config.assemble_system_mass_properties(update_copies=True)
-
-    total_aircraft_mass = base_config.system.quantities.mass_properties.mass
-    total_aircraft_mass.name = "total_aircraft_mass"
-    total_aircraft_mass.set_as_constraint(upper=6, scaler=1e-3)
-
-    print(aircraft.quantities.mass_properties.mass)
-
-    print(id(payload.quantities.mass_properties))
-    print(id(aircraft.quantities.mass_properties))
-
-    # aircraft.quantities.mass_properties.mass = 1100
-    # aircraft.quantities.mass_properties.cg_vector = np.array([2.2513916, 0., 0.216399])
-    # aircraft.quantities.mass_properties.inertia_tensor = np.zeros((3, 3))
-
-
-    base_config.assemble_system_mass_properties()
-
-    print(aircraft.quantities.mass_properties.mass.value)
-    print(base_config.system.quantities.mass_properties)
-
-    ## THE LPC WAY ################################################################
-        # Get base config and conditions
-    base_config = caddee.base_configuration
-    conditions = caddee.conditions
-
-    if do_cruise:
+        # get some operational variables from the cruise condition
         cruise = conditions["cruise"]
-        cruise_speed = cruise.parameters.speed[0]
-    else:
-        cruise_speed = csdl.Variable(shape=(1, ), value=61.24764871)
+        rho_imperial = cruise.quantities.atmos_states.density * (1 / units.mass.slug_to_kg) / (1 / units.length.foot_to_m)**3
+        speed_imperial = cruise.parameters.speed * (1 / units.speed.ftps_to_mps)
+        q_cruise = 0.5 * rho_imperial * speed_imperial**2
+        range_imperial = cruise.parameters.range * (1/ units.length.nautical_mile_to_m)
 
-    # Get system component
-    aircraft = base_config.system
-    
-    # Get airframe and its components
-    airframe  = aircraft #not using the airframe object
-    
-    # battery
-    battery = airframe.comps["battery"] #Dont have a battery in here atm
-    battery_cg = csdl.Variable(shape=(3, ), value=np.array([-2.85, 0., -1.]))
-    battery_mass = 1.2 #double check that
-    battery.quantities.mass_properties.mass = battery_mass
-    battery.quantities.mass_properties.cg_vector = battery_cg
-    
-    # Wing
-    wing = airframe.comps["wing"]
-    wing_area = wing.parameters.S_ref
-    wing_AR = wing.parameters.AR
-    
-    beam_mesh = base_config.mesh_container["beam_mesh"] #didnt mesh this yet
-    wing_box = beam_mesh.discretizations["wing_box_beam"] #again
-    aluminum = wing.quantities.material_properties.material
+        #Access the base config and the its components
+        aircraft = base_config.system
 
-    box_cs = af.CSBox(
-        ttop=wing_box.top_skin_thickness,
-        tbot=wing_box.bottom_skin_thickness,
-        tweb=wing_box.shear_web_thickness,
-        height=wing_box.beam_height,
-        width=wing_box.beam_width,
-    )
-    beam_plus_5g = af.Beam(
-        name="wing_beam", 
-        mesh=wing_box.nodal_coordinates, 
-        cs=box_cs,
-        material=aluminum,
-    )
+        wing = aircraft.comps["wing"]
+        fuselage = aircraft.comps["fuselage"]
+        h_tail = aircraft.comps["h_tail"]
+        v_tail = aircraft.comps["v_tail"]
+        #main_landing_gear = aircraft.comps["main_landing_gear"]
+        #avionics = fuselage.comps["avionics"]
+        #instruments = fuselage.comps["instruments"]
+        #engine = aircraft.comps["engine"]
+        #fuel = wing.comps["fuel"]
+        payload = fuselage.comps["payload"]
 
-    beam_minus_3g = af.Beam(
-        name="wing_beam", 
-        mesh=wing_box.nodal_coordinates, 
-        cs=box_cs,
-        material=aluminum,
-    )
-    wing_mass_model = af.FrameMass()
-    wing_mass_model.add_beam(beam_plus_5g)
-    wing_mps = wing_mass_model.evaluate()
-    wing_cg = wing_mps.cg
-    wing_cg = wing_cg.set(csdl.slice[1], 0)
-    wing_mass = wing_mps.mass * 2
-    wing_mass.name = "wing_mass"
-    # wing_mass.set_as_objective(scaler=8e-3)
-    wing.quantities.mass_properties.mass = wing_mass
-    wing.quantities.mass_properties.cg_vector = wing_cg
+        # design gross weight estimate dont need because we dont need it for statistical sizing?
+        #dg_est = csdl.ImplicitVariable(shape=(1, ), value=6)
+        dg_est = 6
 
-    if do_structural_sizing:
-        aircraft_in_3g = conditions["plus_5g"].configuration.system
-        aircraft_in_m1g = conditions["minus_3g"].configuration.system
+        #fuel_weight = csdl.Variable(shape=(1,), value=500)
+        #engine_weight = csdl.Variable(shape=(1,), value=250)
+        #payload_weight =  csdl.Variable(shape=(1,), value=0.3)
 
-        wing_in_3g = aircraft_in_3g.comps["airframe"].comps["wing"]
-        wing_in_m1g = aircraft_in_m1g.comps["airframe"].comps["wing"]
+        #I think add battery weight and make battery CG a design variable to help meet static marge
+        # systems
+        # systems = aircraft.comps["systems"]
+        # systems_mass = csdl.Variable(shape=(1, ), value=244)
+        # systems_cg = csdl.Variable(shape=(3, ), value=np.array([-1., 0., -1.5]))
+        # systems.quantities.mass_properties.mass = systems_mass
+        # systems.quantities.mass_properties.cg_vector = systems_cg
 
-        wing_in_3g.quantities.beam = beam_plus_5g
-        wing_in_m1g.quantities.beam = beam_minus_3g
+        # wing mass
+        ## WRITE CUSTOM WING MASS MODEL AS FUNCTION OF CSDL VARIABLES ()
+        S_ref=wing.parameters.S_ref #Are these being treated correctly as CSDL variables?
+        AR=wing.parameters.AR
+
+        spar_OD = 0.25 #??? I think I need to make a spar componet in CADDEE first?
+        wing_weight = wing_weight_model(AR,S_ref,4,4,12,spar_OD)
+
+        # fuselage mass CONST
+        fuselage_weight = 3
+
+        # h tail mass
+        h_tail_weight = 0.2
+
+        # v tail mass
+        v_tail_weight = 0.1
+
+        # avionics mass CONST
+        avionics_weight = 1
+
+        # instruments mass CONST
+        instruments_weight = 0.5
+
+        # Landing gear mass CONST
+        landing_gear_weight = 0.2    
+
+        #You should probably find a more accurate CG for these things
+        wing.quantities.mass_properties.mass = wing_weight * units.mass.pound_to_kg
+        wing.quantities.mass_properties.cg_vector = np.array([1 * units.length.foot_to_m, 0. , 2. * units.length.foot_to_m])
+
+        fuselage.quantities.mass_properties.mass = fuselage_weight * units.mass.pound_to_kg
+        fuselage.quantities.mass_properties.cg_vector = np.array([1 * units.length.foot_to_m, 0. , 0.])
+
+        h_tail.quantities.mass_properties.mass = h_tail_weight * units.mass.pound_to_kg
+        h_tail.quantities.mass_properties.cg_vector = np.array([1 * units.length.foot_to_m, 0., 0.051 * units.length.foot_to_m])
+
+        v_tail.quantities.mass_properties.mass = h_tail_weight * units.mass.pound_to_kg
+        v_tail.quantities.mass_properties.cg_vector = np.array([1 * units.length.foot_to_m, 0., 1.51 * units.length.foot_to_m])
+
+        weights_solver = cd.aircraft.models.weights.WeightsSolverModel()
+        weights_solver.evaluate(
+            dg_est, wing_weight, fuselage_weight, h_tail_weight, v_tail_weight, avionics_weight, instruments_weight, landing_gear_weight
+        )
+        base_config.assemble_system_mass_properties(update_copies=True)
+
+        total_aircraft_mass = base_config.system.quantities.mass_properties.mass
+        total_aircraft_mass.name = "total_aircraft_mass"
+        total_aircraft_mass.set_as_constraint(upper=6, scaler=1e-3)
+
+        print(aircraft.quantities.mass_properties.mass)
+
+        print(id(payload.quantities.mass_properties))
+        print(id(aircraft.quantities.mass_properties))
+
+        # aircraft.quantities.mass_properties.mass = 1100
+        # aircraft.quantities.mass_properties.cg_vector = np.array([2.2513916, 0., 0.216399])
+        # aircraft.quantities.mass_properties.inertia_tensor = np.zeros((3, 3))
+
+        base_config.assemble_system_mass_properties()
+
+        print(aircraft.quantities.mass_properties.mass.value)
+        print(base_config.system.quantities.mass_properties)
+
+        ## THE LPC WAY ################################################################
+            # Get base config and conditions
+    lpc = False #This way includes A-frame but may be way more complicated than we need.
+    if lpc:
+        base_config = caddee.base_configuration
+        conditions = caddee.conditions
+
+        if do_cruise:
+            cruise = conditions["cruise"]
+            cruise_speed = cruise.parameters.speed[0]
+        else:
+            cruise_speed = csdl.Variable(shape=(1, ), value=20)
+
+        # Get system component
+        aircraft = base_config.system
+        
+        # battery
+        battery = aircraft.comps["battery"] #Dont have a battery in here atm
+        battery_cg = csdl.Variable(shape=(3, ), value=np.array([-2.85, 0., -1.]))
+        battery_mass = 1.2 #double check that
+        battery.quantities.mass_properties.mass = battery_mass
+        battery.quantities.mass_properties.cg_vector = battery_cg
+        
+        # Wing
+        wing = aircraft.comps["wing"]
+        wing_area = wing.parameters.S_ref
+        wing_AR = wing.parameters.AR
+        
+        beam_mesh = base_config.mesh_container["beam_mesh"] #didnt mesh this yet
+        wing_box = beam_mesh.discretizations["wing_box_beam"] #again
+        carbon_fiber = wing.quantities.material_properties.material
+
+        box_cs = af.CSBox(
+            ttop=wing_box.top_skin_thickness,
+            tbot=wing_box.bottom_skin_thickness,
+            tweb=wing_box.shear_web_thickness,
+            height=wing_box.beam_height,
+            width=wing_box.beam_width,
+        )
+        beam_plus_5g = af.Beam(
+            name="wing_beam", 
+            mesh=wing_box.nodal_coordinates, 
+            cs=box_cs,
+            material=carbon_fiber,
+        )
+
+        beam_minus_3g = af.Beam(
+            name="wing_beam", 
+            mesh=wing_box.nodal_coordinates, 
+            cs=box_cs,
+            material=carbon_fiber,
+        )
+        wing_mass_model = af.FrameMass()
+        wing_mass_model.add_beam(beam_plus_5g)
+        wing_mps = wing_mass_model.evaluate()
+        wing_cg = wing_mps.cg
+        wing_cg = wing_cg.set(csdl.slice[1], 0)
+        wing_mass = wing_mps.mass * 2
+        wing_mass.name = "wing_mass"
+        wing.quantities.mass_properties.mass = wing_mass
+        wing.quantities.mass_properties.cg_vector = wing_cg
+
+        if do_structural_sizing:
+            aircraft_in_3g = conditions["plus_5g"].configuration.system
+            aircraft_in_m1g = conditions["minus_3g"].configuration.system
+
+            wing_in_3g = aircraft_in_3g.comps["aircraft"].comps["wing"]
+            wing_in_m1g = aircraft_in_m1g.comps["aircraft"].comps["wing"]
+
+            wing_in_3g.quantities.beam = beam_plus_5g
+            wing_in_m1g.quantities.beam = beam_minus_3g
 
 
-    # Fuselage
-    fuselage = airframe.comps["fuselage"]
-    fuselage_length = fuselage.parameters.length
+        # Fuselage
+        fuselage = aircraft.comps["fuselage"]
+        fuselage_length = fuselage.parameters.length
 
-    # Empennage
-    empennage = airframe.comps["empennage"]
-    h_tail = empennage.comps["h_tail"]
-    h_tail_area = h_tail.parameters.S_ref
-    v_tail = empennage.comps["v_tail"]
-    v_tail_area =  v_tail.parameters.S_ref
-    
-    # Booms
-    booms = airframe.comps["booms"]
+        # Empennage
+        empennage = aircraft.comps["empennage"]
+        h_tail = empennage.comps["h_tail"]
+        h_tail_area = h_tail.parameters.S_ref
+        v_tail = empennage.comps["v_tail"]
+        v_tail_area =  v_tail.parameters.S_ref
+        
+        # Booms
+        booms = aircraft.comps["booms"]
 
-    # M4-regression mass models (scaled to match better with NDARC)
-    nasa_lpc_weights = cd.aircraft.models.weights.nasa_lpc
-    scaler = 1.3
-    # wing_mps = nasa_lpc_weights.compute_wing_mps(
-    #     wing_area=wing_area,
-    #     wing_AR=wing_AR,
-    #     fuselage_length=fuselage_length,
-    #     battery_mass=battery_mass, 
-    #     cruise_speed=cruise_speed,
-    # )
-    # wing_mps.mass = wing_mps.mass * scaler
-    # wing.quantities.mass_properties.mass = wing_mps.mass
-    # wing.quantities.mass_properties.cg_vector = wing_mps.cg_vector
-    # wing.quantities.mass_properties.inertia_tensor = wing_mps.inertia_tensor
+        # M4-regression mass models (scaled to match better with NDARC)
+        nasa_lpc_weights = cd.aircraft.models.weights.nasa_lpc
+        scaler = 1.3
+        # wing_mps = nasa_lpc_weights.compute_wing_mps(
+        #     wing_area=wing_area,
+        #     wing_AR=wing_AR,
+        #     fuselage_length=fuselage_length,
+        #     battery_mass=battery_mass, 
+        #     cruise_speed=cruise_speed,
+        # )
+        # wing_mps.mass = wing_mps.mass * scaler
+        # wing.quantities.mass_properties.mass = wing_mps.mass
+        # wing.quantities.mass_properties.cg_vector = wing_mps.cg_vector
+        # wing.quantities.mass_properties.inertia_tensor = wing_mps.inertia_tensor
 
-    fuselage_mps = nasa_lpc_weights.compute_fuselage_mps(
-        wing_area=wing_area,
-        wing_AR=wing_AR,
-        fuselage_length=fuselage_length,
-        battery_mass=battery_mass,
-        cruise_speed=cruise_speed,
-    )
-    fuselage_mps.mass = fuselage_mps.mass * scaler
-    fuselage.quantities.mass_properties.mass = fuselage_mps.mass
-    fuselage.quantities.mass_properties.cg_vector = fuselage_mps.cg_vector
-    fuselage.quantities.mass_properties.inertia_tensor = fuselage_mps.inertia_tensor
+        fuselage_mps = nasa_lpc_weights.compute_fuselage_mps(
+            wing_area=wing_area,
+            wing_AR=wing_AR,
+            fuselage_length=fuselage_length,
+            battery_mass=battery_mass,
+            cruise_speed=cruise_speed,
+        )
+        fuselage_mps.mass = fuselage_mps.mass * scaler
+        fuselage.quantities.mass_properties.mass = fuselage_mps.mass
+        fuselage.quantities.mass_properties.cg_vector = fuselage_mps.cg_vector
+        fuselage.quantities.mass_properties.inertia_tensor = fuselage_mps.inertia_tensor
 
-    boom_mps = nasa_lpc_weights.compute_boom_mps(
-        wing_area=wing_area,
-        wing_AR=wing_AR,
-        fuselage_length=fuselage_length,
-        battery_mass=battery_mass,
-        cruise_speed=cruise_speed,
-    )
-    boom_mps.mass = boom_mps.mass * scaler
-    booms.quantities.mass_properties.mass = boom_mps.mass
-    booms.quantities.mass_properties.cg_vector = boom_mps.cg_vector
-    booms.quantities.mass_properties.inertia_tensor = boom_mps.inertia_tensor
+        boom_mps = nasa_lpc_weights.compute_boom_mps(
+            wing_area=wing_area,
+            wing_AR=wing_AR,
+            fuselage_length=fuselage_length,
+            battery_mass=battery_mass,
+            cruise_speed=cruise_speed,
+        )
+        boom_mps.mass = boom_mps.mass * scaler
+        booms.quantities.mass_properties.mass = boom_mps.mass
+        booms.quantities.mass_properties.cg_vector = boom_mps.cg_vector
+        booms.quantities.mass_properties.inertia_tensor = boom_mps.inertia_tensor
 
-    empennage_mps = nasa_lpc_weights.compute_empennage_mps(
-        h_tail_area=h_tail_area,
-        v_tail_area=v_tail_area,
-    )
-    empennage_mps.mass = empennage_mps.mass * scaler
-    empennage.quantities.mass_properties = empennage_mps
+        empennage_mps = nasa_lpc_weights.compute_empennage_mps(
+            h_tail_area=h_tail_area,
+            v_tail_area=v_tail_area,
+        )
+        empennage_mps.mass = empennage_mps.mass * scaler
+        empennage.quantities.mass_properties = empennage_mps
 
-    # Motors
-    motor_group = airframe.comps["motors"]
-    motors = list(motor_group.comps.values())
-    
-        # get rotor meshes to obtain thrust origin (i.e., motor cg)
-    mesh_container = base_config.mesh_container
-    rotor_meshes = mesh_container["rotor_meshes"]
-    
-        # Loop over all motors to assign mass properties
-    for i, rotor_mesh in enumerate(rotor_meshes.discretizations.values()):
-        motor_comp = motors[i]
-        motor_mass = csdl.Variable(name=f"motor_{i}_mass", shape=(1, ), value=25)
-        if run_optimization:
-            if do_structural_sizing is True and run_ffd is False:
-                pass
-            elif do_trim_optimization:
-                pass
-            else:
-                motor_mass.set_as_design_variable(upper=50, lower=5, scaler=5e-2)
-        motor_cg = rotor_mesh.thrust_origin
-        motor_comp.quantities.mass_properties.mass = motor_mass
-        motor_comp.quantities.mass_properties.cg_vector = motor_cg
+        # Motors
+        motor_group = aircraft.comps["motors"]
+        motors = list(motor_group.comps.values())
+        
+            # get rotor meshes to obtain thrust origin (i.e., motor cg)
+        mesh_container = base_config.mesh_container
+        rotor_meshes = mesh_container["rotor_meshes"]
+        
+            # Loop over all motors to assign mass properties
+        for i, rotor_mesh in enumerate(rotor_meshes.discretizations.values()):
+            motor_comp = motors[i]
+            motor_mass = csdl.Variable(name=f"motor_{i}_mass", shape=(1, ), value=25)
+            if run_optimization:
+                if do_structural_sizing is True and run_ffd is False:
+                    pass
+                elif do_trim_optimization:
+                    pass
+                else:
+                    motor_mass.set_as_design_variable(upper=50, lower=5, scaler=5e-2)
+            motor_cg = rotor_mesh.thrust_origin
+            motor_comp.quantities.mass_properties.mass = motor_mass
+            motor_comp.quantities.mass_properties.cg_vector = motor_cg
 
-    # payload
-    payload = airframe.comps["payload"]
-    payload_mass = csdl.Variable(shape=(1, ), value=540+800)
-    payload_cg = csdl.Variable(shape=(3, ), value=np.array([-3., 0., -1.5]))
-    payload.quantities.mass_properties.mass = payload_mass
-    payload.quantities.mass_properties.cg_vector = payload_cg
+        # payload
+        payload = aircraft.comps["payload"]
+        payload_mass = csdl.Variable(shape=(1, ), value=540+800)
+        payload_cg = csdl.Variable(shape=(3, ), value=np.array([-3., 0., -1.5]))
+        payload.quantities.mass_properties.mass = payload_mass
+        payload.quantities.mass_properties.cg_vector = payload_cg
 
-    # systems
-    systems = airframe.comps["systems"]
-    systems_mass = csdl.Variable(shape=(1, ), value=244)
-    systems_cg = csdl.Variable(shape=(3, ), value=np.array([-1., 0., -1.5]))
-    systems.quantities.mass_properties.mass = systems_mass
-    systems.quantities.mass_properties.cg_vector = systems_cg
+        # systems
+        systems = aircraft.comps["systems"]
+        systems_mass = csdl.Variable(shape=(1, ), value=244)
+        systems_cg = csdl.Variable(shape=(3, ), value=np.array([-1., 0., -1.5]))
+        systems.quantities.mass_properties.mass = systems_mass
+        systems.quantities.mass_properties.cg_vector = systems_cg
 
-    # Assemble system mass properties
-    base_config.assemble_system_mass_properties(update_copies=True)
+        # Assemble system mass properties
+        base_config.assemble_system_mass_properties(update_copies=True)
 
-    aircraft_mass = base_config.system.quantities.mass_properties.mass
-    aircraft_mass.name = "aircraft_mass"
-    if do_trim_optimization:
-        pass
-    else:
-        aircraft_mass.set_as_objective(scaler=8e-4)
+        aircraft_mass = base_config.system.quantities.mass_properties.mass
+        aircraft_mass.name = "aircraft_mass"
 
 def wing_weight_model(AR,S,m,p,t,spar_outer_diameter):
+    #This is not CSDL'd at the moment bc im hoping to simplify it.
     b = m.sqrt(AR*S) #ft
     c = b/AR #ft
 
@@ -679,6 +638,8 @@ def define_analysis(caddee: cd.CADDEE):
     cruise = caddee.conditions["cruise"]
     cruise_config = cruise.configuration
     mesh_container = cruise_config.mesh_container
+    base_config = caddee.base_configuration
+    aircraft = base_config.system
 
     # Re-evaluate meshes and compute nodal velocities
     cruise.finalize_meshes()
@@ -713,7 +674,7 @@ def define_analysis(caddee: cd.CADDEE):
     total_induced_drag = vlm_outputs_1.total_drag * -1
     total_lift = vlm_outputs_1.total_lift * -1
     
-    mark2_weight = weight ##I GOTTA DO SOMETHING HERE I GUESS
+    mark2_weight = aircraft.quantities.mass_properties.mass
 
     lift_constraint = total_lift - mark2_weight
     lift_constraint.name = "lift_equals_weight_constraint"
@@ -726,15 +687,15 @@ def define_analysis(caddee: cd.CADDEE):
 def define_plus_5g(plus_5g):
     plus_5g_config = plus_5g.configuration
     mesh_container = plus_5g_config.mesh_container
-    airframe = plus_5g_config.system.comps["airframe"] #Are we using airframe?
-    wing = airframe.comps["wing"]
-    fuselage = airframe.comps["fuselage"]
-    v_tail = airframe.comps["empennage"].comps["v_tail"]
-    rotors = airframe.comps["rotors"]
-    booms = list(airframe.comps["booms"].comps.values())
+    aircraft = plus_5g_config.system
+    wing = aircraft.comps["wing"]
+    fuselage = aircraft.comps["fuselage"]
+    v_tail = aircraft.comps["empennage"].comps["v_tail"]
+    rotors = aircraft.comps["rotors"]
+    booms = list(aircraft.comps["booms"].comps.values())
 
     # Actuate tail
-    tail = airframe.comps["empennage"].comps["h_tail"]
+    tail = aircraft.comps["empennage"].comps["h_tail"]
     elevator_deflection = csdl.Variable(name="plus_5g_elevator", shape=(1, ), value=0)
     elevator_deflection.set_as_design_variable(lower=np.deg2rad(-20), upper=np.deg2rad(20), scaler=10)
     tail.actuate(elevator_deflection)
@@ -888,15 +849,15 @@ def define_plus_5g(plus_5g):
 def define_minus_3g(minus_3g):
     minus_3g_config = minus_3g.configuration
     mesh_container = minus_3g_config.mesh_container
-    airframe = minus_3g_config.system.comps["airframe"]
-    wing = airframe.comps["wing"]
-    fuselage = airframe.comps["fuselage"]
-    v_tail = airframe.comps["empennage"].comps["v_tail"]
-    rotors = airframe.comps["rotors"]
-    booms = list(airframe.comps["booms"].comps.values())
+    aircraft = minus_3g_config.system
+    wing = aircraft.comps["wing"]
+    fuselage = aircraft.comps["fuselage"]
+    v_tail = aircraft.comps["empennage"].comps["v_tail"]
+    rotors = aircraft.comps["rotors"]
+    booms = list(aircraft.comps["booms"].comps.values())
 
     # Actuate tail
-    tail = airframe.comps["empennage"].comps["h_tail"]
+    tail = aircraft.comps["empennage"].comps["h_tail"]
     elevator_deflection = csdl.Variable(name="minus_3g_elevator", shape=(1, ), value=0.)
     elevator_deflection.set_as_design_variable(lower=np.deg2rad(-20), upper=np.deg2rad(20), scaler=10)
     tail.actuate(elevator_deflection)
@@ -1051,16 +1012,19 @@ def define_minus_3g(minus_3g):
 def define_cruise(cruise):
     cruise_config = cruise.configuration
     mesh_container = cruise_config.mesh_container
-    airframe = cruise_config.system.comps["airframe"] #This gonna throw errors girly
-    wing = airframe.comps["wing"]
-    fuselage = airframe.comps["fuselage"]
-    v_tail = airframe.comps["empennage"].comps["v_tail"]
-    boomFR = airframe.comps["boom_FR"]
+    aircraft = cruise_config.system #This might throw errors??? Go check
+    wing = aircraft.comps["wing"]
+    fuselage = aircraft.comps["fuselage"]
+    v_tail = aircraft.comps["empennage"].comps["v_tail"]
+    boomFR = aircraft.comps["boom_FR"]
+    boomBR = aircraft.comps["boom_BR"]
+    boomFL = aircraft.comps["boom_FL"]
+    boomBL = aircraft.comps["boom_BL"]
     #modfy
-    #booms = list(airframe.comps["booms"].comps.values())
+    #booms = list(aircraft.comps["booms"].comps.values())
 
     # Actuate tail
-    tail = airframe.comps["empennage"].comps["h_tail"]
+    tail = aircraft.comps["empennage"].comps["h_tail"]
     elevator_deflection = csdl.Variable(name="cruise_elevator", shape=(1, ), value=0)
     elevator_deflection.set_as_design_variable(lower=np.deg2rad(-10), upper=np.deg2rad(10), scaler=10)
     tail.actuate(elevator_deflection)
@@ -1103,7 +1067,7 @@ def define_cruise(cruise):
     drag_build_up_model = cd.aircraft.models.aero.compute_drag_build_up
 
     drag_build_up = drag_build_up_model(cruise.quantities.ac_states, cruise.quantities.atmos_states,
-                                        wing.parameters.S_ref, [wing, fuselage, tail, v_tail] + booms)
+                                        wing.parameters.S_ref, [wing, fuselage, tail, v_tail] + boomFR+boomBR+boomFL+boomBL)
     
     
     cruise_power = {}
@@ -1147,7 +1111,7 @@ def define_cruise(cruise):
     
     return accel_cruise, total_forces_cruise, total_moments_cruise
 
-if __name__ == "__main__": #I like doing this because it makes it clear where the main executiom begins
+if __name__ == "__main__": #I like doing this because it makes it clear where the main executiom begins and also I can collapse it : )
     # Run the code (forward evaluation)
 
     # make instance of CADDEE class
