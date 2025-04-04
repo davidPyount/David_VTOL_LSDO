@@ -162,7 +162,7 @@ def define_base_config(caddee : cd.CADDEE):
     )
     boomFR = cd.Component(boomFR_geometry,length=wing_boom_length/2)
     aircraft.comps["boom_FR"] = boomFR
-    base_config.connect_component_geometries(boomFR,wing,connection_point=boomFR.ffd_block_face1)
+    base_config.connect_component_geometries(boomFR,wing,boomFR.ffd_block_face_1)
 
     #Back Right
     boomBR_geometry = aircraft.create_subgeometry(
@@ -170,7 +170,7 @@ def define_base_config(caddee : cd.CADDEE):
     )
     boomBR = cd.Component(boomBR_geometry,length=wing_boom_length/2)
     aircraft.comps["boom_BR"] = boomBR
-    base_config.connect_component_geometries(boomBR,wing,connection_point=boomFR.ffd_block_face1)
+    base_config.connect_component_geometries(boomBR,wing,connection_point=boomFR.ffd_block_face_1)
 
     #Front Left
     boomFL_geometry = aircraft.create_subgeometry(
@@ -178,7 +178,7 @@ def define_base_config(caddee : cd.CADDEE):
     )
     boomFL = cd.Component(boomFL_geometry,length=wing_boom_length/2)
     aircraft.comps["boom_FL"] = boomFL
-    base_config.connect_component_geometries(boomFL,wing,connection_point=boomFR.ffd_block_face1)
+    base_config.connect_component_geometries(boomFL,wing,connection_point=boomFR.ffd_block_face_1)
 
     #Back Left
     boomBL_geometry = aircraft.create_subgeometry(
@@ -186,7 +186,7 @@ def define_base_config(caddee : cd.CADDEE):
     )
     boomBL = cd.Component(boomBL_geometry,length=wing_boom_length/2)
     aircraft.comps["boom_BL"] = boomBL
-    base_config.connect_component_geometries(boomBL,wing,connection_point=boomFR.ffd_block_face1)
+    base_config.connect_component_geometries(boomBL,wing,connection_point=boomFR.ffd_block_face_1)
 
 
     ## MAKE MESHES
@@ -245,9 +245,9 @@ def define_conditions(caddee: cd.CADDEE):
         #+5g
         pitch_angle5g = csdl.Variable(name="5g_pitch",shape=(1,),value=np.deg2rad(10))
         pitch_angle.set_as_design_variable(upper=np.deg2rad(15),lower=0,scaler=10)
-        flight_path_angle5g = csdl.Variable(shape=(1,0),value=np.deg2rad(5))
+        flight_path_angle5g = csdl.Variable(shape=(1,),value=np.deg2rad(5))
         plus_5g = cd.aircraft.conditions.ClimbCondition(
-            initial_altitiude = 50,
+            initial_altitude = 50,
             final_altitude=150,
             pitch_angle=pitch_angle5g,
             fligth_path_angle=flight_path_angle5g,
@@ -259,16 +259,16 @@ def define_conditions(caddee: cd.CADDEE):
         #-3
         pitch_angle3g = csdl.Variable(name="3g_pitch",shape=(1,),value=np.deg2rad(-8))
         pitch_angle3g.set_as_design_variable(upper=0,lower=np.deg2rad(-15),scaler=10)
-        flight_path_angle3g = csdl.Variable(shape=(1,0),value=np.deg2rad(-1))
-        plus_5g = cd.aircraft.conditions.ClimbCondition(
-            initial_altitiude = 150,
+        flight_path_angle3g = csdl.Variable(shape=(1),value=np.deg2rad(-1))
+        minus_3g = cd.aircraft.conditions.ClimbCondition(
+            initial_altitude = 150,
             final_altitude=50,
             pitch_angle=pitch_angle3g,
             fligth_path_angle=flight_path_angle3g,
             mach_number=0.04,
         )
-        plus_5g.configuration = base_config.copy()
-        conditions["minus_3g"] = plus_5g
+        minus_3g.configuration = base_config.copy()
+        conditions["minus_3g"] = minus_3g
 
 def define_mass_properties(caddee : cd.CADDEE):
     """Define vehicle-level mass properties of the base configuration."""
