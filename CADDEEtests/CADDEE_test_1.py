@@ -9,6 +9,7 @@ from CADDEE_alpha.utils.units import Units
 import lsdo_function_spaces as lfs
 import aframe as af
 import aeroelastic_coupling_utils as acu
+import os #for relative path import
 units = Units()
 
 # Start the CSDL recorder
@@ -16,7 +17,9 @@ recorder = csdl.Recorder(inline=True, expand_ops=True)
 recorder.start()
 
 # import geometry
-mark2_geom = cd.import_geometry("C:/Users/david/OneDrive - UC San Diego/GitHub/LSDO/David_VTOL_LSDO/CADDEEtests/mark2.stp")
+dirname = os.path.dirname(__file__) #relative path
+filename = os.path.join(dirname, 'mark2.stp')
+mark2_geom = cd.import_geometry(filename)
 plotting_elements = mark2_geom.plot(show=False, opacity=0.5, color='#FFCD00')
 
 ft2m = 0.3048
@@ -91,7 +94,7 @@ def define_base_config(caddee : cd.CADDEE):
     )
 
     # Wing spar material
-    carbon_fiber = af.Material(name='carbon_fiber', E=96.2E9, G = 3.16E9, density = 1420)
+    carbon_fiber = af.Material(name='carbon_fiber',E=96.2E9, G = 3.16E9, density = 1420)
 
     # Function spaces DO WE NEED THESE?
     # Thickness
