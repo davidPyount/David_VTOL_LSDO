@@ -160,7 +160,7 @@ def define_base_config(caddee : cd.CADDEE):
     boomFR_geometry = aircraft.create_subgeometry(
         search_names=["FrontRightBoom"]
     )
-    boomFR = cd.Componet(boomFR_geometry,length=wing_boom_length/2)
+    boomFR = cd.Component(boomFR_geometry,length=wing_boom_length/2)
     aircraft.comps["boom_FR"] = boomFR
     base_config.connect_component_geometries(boomFR,wing,connection_point=boomFR.ffd_block_face1)
 
@@ -168,7 +168,7 @@ def define_base_config(caddee : cd.CADDEE):
     boomBR_geometry = aircraft.create_subgeometry(
         search_names=["BackRightBoom"]
     )
-    boomBR = cd.Componet(boomBR_geometry,length=wing_boom_length/2)
+    boomBR = cd.Component(boomBR_geometry,length=wing_boom_length/2)
     aircraft.comps["boom_BR"] = boomBR
     base_config.connect_component_geometries(boomBR,wing,connection_point=boomFR.ffd_block_face1)
 
@@ -176,7 +176,7 @@ def define_base_config(caddee : cd.CADDEE):
     boomFL_geometry = aircraft.create_subgeometry(
         search_names=["FrontLeftBoom"]
     )
-    boomFL = cd.Componet(boomFL_geometry,length=wing_boom_length/2)
+    boomFL = cd.Component(boomFL_geometry,length=wing_boom_length/2)
     aircraft.comps["boom_FL"] = boomFL
     base_config.connect_component_geometries(boomFL,wing,connection_point=boomFR.ffd_block_face1)
 
@@ -184,7 +184,7 @@ def define_base_config(caddee : cd.CADDEE):
     boomBL_geometry = aircraft.create_subgeometry(
         search_names=["BackLeftBoom"]
     )
-    boomBL = cd.Componet(boomBL_geometry,length=wing_boom_length/2)
+    boomBL = cd.Component(boomBL_geometry,length=wing_boom_length/2)
     aircraft.comps["boom_BL"] = boomBL
     base_config.connect_component_geometries(boomBL,wing,connection_point=boomFR.ffd_block_face1)
 
