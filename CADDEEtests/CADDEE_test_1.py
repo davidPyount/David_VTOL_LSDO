@@ -12,6 +12,12 @@ import aeroelastic_coupling_utils as acu
 import os #for relative path import
 units = Units()
 
+#TO DO
+#CSDL Trapz function -> Updated weights model -> create static stability criteria (both vtol and FW) -> informs spar length (tail arm), boom placement
+#Determine why objective function isnt really working : (
+
+
+
 # Start the CSDL recorder
 recorder = csdl.Recorder(inline=True, expand_ops=True)
 recorder.start()
@@ -118,11 +124,23 @@ def define_base_config(caddee : cd.CADDEE):
     base_config.connect_component_geometries(fuselage, wing, 0.75 * wing.LE_center + 0.25 * wing.TE_center)
     # base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center)
 
+
+    #Making hstab parameters changeable.
+    h_stab_AR = h_stab_span/h_stab_chord #why
+    h_stab_AR = csdl.Variable(name="hstab_aspect_ratio", value=h_stab_AR)
+    h_stab_root_twist = csdl.Variable(name="h_stab_root_twist", value=np.deg2rad(0))
+    h_stab_tip_twist = csdl.Variable(name="h_stab_tip_twist", value=np.deg2rad(0))
+
+    # Set design variables for wing
+    h_stab_AR.set_as_design_variable(upper=1.5 * wing_AR, lower=0.5 * wing_AR, scaler=1/8)
+    h_stab_root_twist.set_as_design_variable(upper=np.deg2rad(5), lower=np.deg2rad(-5), scaler=4)
+    h_stab_tip_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=2)
+
     # Make horizontal tail geometry & component
     h_tail_geometry = aircraft.create_subgeometry(search_names=["HStab"])
     h_tail = cd.aircraft.components.Wing(
         AR=h_stab_AR, S_ref=h_stab_area, taper_ratio=h_stab_taper, 
-        geometry=h_tail_geometry
+        geometry=h_tail_geometry, root_twist_delta=h_stab_root_twist, tip_twist_delta=h_stab_tip_twist
     )
 
     # Assign tail component to aircraft
@@ -149,20 +167,24 @@ def define_base_config(caddee : cd.CADDEE):
     aircraft.comps["main_spar"] = main_spar
 
 
-    # # Connect h-tail to spar?
-    # base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center) TE_center doesnt work for some reason
-    # # Connect v-tail to spar?
-    # base_config.connect_component_geometries(main_spar, v_tail, v_tail.TE_center)
+    # Connect h-tail to spar?
+    base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center) #TE_center doesnt work for some reason
+    # Connect v-tail to spar?
+    #base_config.connect_component_geometries(main_spar, v_tail, v_tail.TE_center) vtail skips ffd so can we connect???
 
     #Booms
     #These dont have rotors at the moment. Not sure if we need, not using rotorAD
     #Front Right
+    boom_connection_point_initial = 18/12*ft2m
+    boom_connection_point = csdl.Variable(name = 'Boom Connection Point',shape = (1,),value = boom_connection_point_initial)
+    boom_connection_point.set_as_design_variable(upper = wing_span *1.2, lower = 0.5, scaler = 1e-1) #Bounds kind of arbitrary.
+
     boomFR_geometry = aircraft.create_subgeometry(
         search_names=["FrontRightBoom"]
     )
     boomFR = cd.Component(boomFR_geometry,length=wing_boom_length/2)
     aircraft.comps["boom_FR"] = boomFR
-    base_config.connect_component_geometries(boomFR,wing,boomFR.ffd_block_face_1)
+    base_config.connect_component_geometries(boomFR,wing,connection_point=(wing.LE_center+wing.TE_center)/2+boom_connection_point)
 
     #Back Right
     boomBR_geometry = aircraft.create_subgeometry(
@@ -170,7 +192,7 @@ def define_base_config(caddee : cd.CADDEE):
     )
     boomBR = cd.Component(boomBR_geometry,length=wing_boom_length/2)
     aircraft.comps["boom_BR"] = boomBR
-    base_config.connect_component_geometries(boomBR,wing,connection_point=boomFR.ffd_block_face_1)
+    base_config.connect_component_geometries(boomBR,wing,connection_point=(wing.LE_center+wing.TE_center)/2+boom_connection_point)
 
     #Front Left
     boomFL_geometry = aircraft.create_subgeometry(
@@ -178,7 +200,7 @@ def define_base_config(caddee : cd.CADDEE):
     )
     boomFL = cd.Component(boomFL_geometry,length=wing_boom_length/2)
     aircraft.comps["boom_FL"] = boomFL
-    base_config.connect_component_geometries(boomFL,wing,connection_point=boomFR.ffd_block_face_1)
+    base_config.connect_component_geometries(boomFL,wing,connection_point=(wing.LE_center+wing.TE_center)/2-boom_connection_point)
 
     #Back Left
     boomBL_geometry = aircraft.create_subgeometry(
@@ -186,8 +208,7 @@ def define_base_config(caddee : cd.CADDEE):
     )
     boomBL = cd.Component(boomBL_geometry,length=wing_boom_length/2)
     aircraft.comps["boom_BL"] = boomBL
-    base_config.connect_component_geometries(boomBL,wing,connection_point=boomFR.ffd_block_face_1)
-
+    base_config.connect_component_geometries(boomBL,wing,connection_point=(wing.LE_center+wing.TE_center)/2-boom_connection_point)
 
     ## MAKE MESHES
     # Meshing
@@ -240,8 +261,7 @@ def define_conditions(caddee: cd.CADDEE):
     cruise.configuration = base_config.copy()
     conditions["cruise"] = cruise
 
-    do_struct_sizing = True
-    if do_struct_sizing:
+    if do_structural_sizing:
         #+5g
         pitch_angle5g = csdl.Variable(name="5g_pitch",shape=(1,),value=np.deg2rad(10))
         pitch_angle.set_as_design_variable(upper=np.deg2rad(15),lower=0,scaler=10)
@@ -614,6 +634,10 @@ def wing_weight_model(AR,S,m,p,t,spar_outer_diameter):
     weight = volume_total*foam_density
     return weight
 
+def csdlTrapIntegrator():
+    print("test")
+
+
 def define_analysis(caddee: cd.CADDEE):
     do_lpc_analysis = False
     if do_lpc_analysis:
@@ -650,6 +674,9 @@ def define_analysis(caddee: cd.CADDEE):
         lattice_coordinates = [wing_chord_surface.nodal_coordinates, h_tail_chord_surface.nodal_coordinates]
         lattice_nodal_velocities = [wing_chord_surface.nodal_velocities, h_tail_chord_surface.nodal_velocities]
 
+
+        #Airfoil is causing issues, what if we dont pass vlm the cl model???
+        Cl_model = None
         vlm_outputs_1 = vlm_solver(
             lattice_coordinates, 
             lattice_nodal_velocities, 
@@ -760,6 +787,9 @@ def define_plus_5g(plus_5g):
     Cp_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["Cp"])
     alpha_stall_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["alpha_Cl_min_max"])
     
+    #Testing not using lsdo airfoil
+    Cl_model = None
+    Cp_model = None
     vlm_outputs = vlm_solver(
         lattice_coordinates, 
         lattice_nodal_velocitiies, 
@@ -924,6 +954,8 @@ def define_minus_3g(minus_3g):
     Cp_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["Cp"])
     alpha_stall_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["alpha_Cl_min_max"])
     
+    Cp_model = None
+    Cl_model = None
     vlm_outputs = vlm_solver(
         lattice_coordinates, 
         lattice_nodal_velocitiies, 
@@ -1044,108 +1076,6 @@ def define_minus_3g(minus_3g):
     
     return accel_minus_3g, total_forces_minus_3g, total_moments_minus_3g
 
-def define_cruise(cruise):
-    cruise_config = cruise.configuration
-    mesh_container = cruise_config.mesh_container
-    aircraft = cruise_config.system #This might throw errors??? Go check
-    wing = aircraft.comps["wing"]
-    fuselage = aircraft.comps["fuselage"]
-    v_tail = aircraft.comps["empennage"].comps["v_tail"]
-    boomFR = aircraft.comps["boom_FR"]
-    boomBR = aircraft.comps["boom_BR"]
-    boomFL = aircraft.comps["boom_FL"]
-    boomBL = aircraft.comps["boom_BL"]
-    #modfy
-    #booms = list(aircraft.comps["booms"].comps.values())
-
-    # Actuate tail
-    tail = aircraft.comps["empennage"].comps["h_tail"]
-    elevator_deflection = csdl.Variable(name="cruise_elevator", shape=(1, ), value=0)
-    elevator_deflection.set_as_design_variable(lower=np.deg2rad(-10), upper=np.deg2rad(10), scaler=10)
-    tail.actuate(elevator_deflection)
-
-    # Re-evaluate meshes and compute nodal velocities
-    cruise.finalize_meshes()
-
-    # Set up VLM analysis
-    vlm_mesh = mesh_container["vlm_mesh"]
-    wing_lattice = vlm_mesh.discretizations["wing_chord_surface"]
-    tail_lattice = vlm_mesh.discretizations["tail_chord_surface"]
-
-    # run vlm solver
-    lattice_coordinates = [wing_lattice.nodal_coordinates, tail_lattice.nodal_coordinates]
-    lattice_nodal_velocitiies = [wing_lattice.nodal_velocities, tail_lattice.nodal_velocities]
-    
-     # Add an airfoil model
-    nasa_langley_airfoil_maker = ThreeDAirfoilMLModelMaker(
-        airfoil_name="ls417",
-            aoa_range=np.linspace(-12, 16, 50), 
-            reynolds_range=[1e5, 2e5, 5e5, 1e6, 2e6, 4e6, 7e6, 10e6], 
-            mach_range=[0., 0.2, 0.3, 0.4, 0.5, 0.6],
-    )
-    Cl_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["Cl"])
-    
-    vlm_outputs = vlm_solver(
-        lattice_coordinates, 
-        lattice_nodal_velocitiies, 
-        atmos_states=cruise.quantities.atmos_states,
-        airfoil_Cd_models=[None, None],#=airfoil_Cd_models,
-        airfoil_Cl_models=[Cl_model, None],
-        airfoil_Cp_models=[None, None],
-        airfoil_alpha_stall_models=[None, None],
-    )
-    
-    vlm_forces = vlm_outputs.total_force
-    vlm_moments = vlm_outputs.total_moment
-    
-    # Drag build-up
-    drag_build_up_model = cd.aircraft.models.aero.compute_drag_build_up
-
-    drag_build_up = drag_build_up_model(cruise.quantities.ac_states, cruise.quantities.atmos_states,
-                                        wing.parameters.S_ref, [wing, fuselage, tail, v_tail] + boomFR+boomBR+boomFL+boomBL)
-    
-    
-    cruise_power = {}
-
-    # # BEM solver
-    # rotor_meshes = mesh_container["rotor_meshes"]
-    # pusher_rotor_mesh = rotor_meshes.discretizations["pusher_prop_mesh"]
-    # mesh_vel = pusher_rotor_mesh.nodal_velocities
-    # cruise_rpm = csdl.Variable(name="cruise_pusher_rpm", shape=(1, ), value=1200)
-    # cruise_rpm.set_as_design_variable(upper=2500, lower=1200, scaler=1e-3)
-    # bem_inputs = RotorAnalysisInputs()
-    # bem_inputs.ac_states = cruise.quantities.ac_states
-    # bem_inputs.atmos_states =  cruise.quantities.atmos_states
-    # bem_inputs.mesh_parameters = pusher_rotor_mesh
-    # bem_inputs.mesh_velocity = mesh_vel
-    # bem_inputs.rpm = cruise_rpm
-    # bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
-    # bem_outputs = bem_model.evaluate(bem_inputs)
-    # cruise_power["pusher_prop"] = bem_outputs.total_power
-    # cruise.quantities.rotor_power_dict = cruise_power
-
-    # total forces and moments
-    total_forces_cruise, total_moments_cruise = cruise.assemble_forces_and_moments(
-        [vlm_forces, drag_build_up], [vlm_moments]
-    )
-
-    # eom
-    eom_model = cd.aircraft.models.eom.SixDofEulerFlatEarthModel()
-    accel_cruise = eom_model.evaluate(
-        total_forces=total_forces_cruise,
-        total_moments=total_moments_cruise,
-        ac_states=cruise.quantities.ac_states,
-        ac_mass_properties=cruise_config.system.quantities.mass_properties
-    )
-    accel_norm_cruise = accel_cruise.accel_norm
-    accel_norm_cruise.name = "cruise_trim"
-    if do_trim_optimization:
-        pass
-    else:
-        accel_norm_cruise.set_as_constraint(upper=0, lower=0, scaler=4)
-    
-    return accel_cruise, total_forces_cruise, total_moments_cruise
-
 if __name__ == "__main__": #I like doing this because it makes it clear where the main executiom begins and also I can collapse it : )
     # Run the code (forward evaluation)
 
@@ -1160,8 +1090,6 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
 
     #Define masses and set up mass models (how do masses change with change in parameters)
     #define_mass_properties(caddee=caddee)
-
-    #define_sub_configurations(caddee)? Unsure if this is needed, figure out what its really doing.
 
     #What analysis are we performing, this calls the other define configuration functions
     define_analysis(caddee=caddee)
