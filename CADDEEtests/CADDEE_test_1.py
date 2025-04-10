@@ -60,7 +60,7 @@ wing_boom_length = 36.2 * ft2m
 
 do_cruise = True
 do_trim_optimization = True
-do_structural_sizing = True
+do_structural_sizing = False
 run_optimization = True
 run_ffd = True
 
@@ -76,7 +76,7 @@ def define_base_config(caddee : cd.CADDEE):
     # why isn't the fuselage component assigned to the aircraft?
     fuselage_geometry = aircraft.create_subgeometry(search_names=["Fuselage"])
     fuselage = cd.aircraft.components.Fuselage(length=fuselage_length, geometry=fuselage_geometry)
-    #aircraft.comps["fuselage"] = fuselage
+    aircraft.comps["fuselage"] = fuselage
 
     # Make wing geometry from aircraft component and instantiate wing component
     wing_geometry = aircraft.create_subgeometry(
@@ -163,7 +163,7 @@ def define_base_config(caddee : cd.CADDEE):
     main_spar_geometry = aircraft.create_subgeometry(
         search_names=["MainSpar"],
     )
-    main_spar = cd.Component(main_spar_geometry,lenght=main_spar_length)
+    main_spar = cd.Component(main_spar_geometry,length=main_spar_length)
     aircraft.comps["main_spar"] = main_spar
 
 
@@ -261,34 +261,6 @@ def define_conditions(caddee: cd.CADDEE):
     cruise.configuration = base_config.copy()
     conditions["cruise"] = cruise
 
-    if do_structural_sizing:
-        #+5g
-        pitch_angle5g = csdl.Variable(name="5g_pitch",shape=(1,),value=np.deg2rad(10))
-        pitch_angle.set_as_design_variable(upper=np.deg2rad(15),lower=0,scaler=10)
-        flight_path_angle5g = csdl.Variable(shape=(1,),value=np.deg2rad(5))
-        plus_5g = cd.aircraft.conditions.ClimbCondition(
-            initial_altitude = 50,
-            final_altitude=150,
-            pitch_angle=pitch_angle5g,
-            fligth_path_angle=flight_path_angle5g,
-            mach_number=0.04,
-        )
-        plus_5g.configuration = base_config.copy()
-        conditions["plus_5g"] = plus_5g
-
-        #-3
-        pitch_angle3g = csdl.Variable(name="3g_pitch",shape=(1,),value=np.deg2rad(-8))
-        pitch_angle3g.set_as_design_variable(upper=0,lower=np.deg2rad(-15),scaler=10)
-        flight_path_angle3g = csdl.Variable(shape=(1,),value=np.deg2rad(-1))
-        minus_3g = cd.aircraft.conditions.ClimbCondition(
-            initial_altitude = 150,
-            final_altitude=50,
-            pitch_angle=pitch_angle3g,
-            fligth_path_angle=flight_path_angle3g,
-            mach_number=0.04,
-        )
-        minus_3g.configuration = base_config.copy()
-        conditions["minus_3g"] = minus_3g
 
 def define_mass_properties(caddee : cd.CADDEE):
     """Define vehicle-level mass properties of the base configuration."""
@@ -497,11 +469,10 @@ def define_mass_properties(caddee : cd.CADDEE):
         ## THE LPC WAY ################################################################
             # Get base config and conditions
 
-
 def wing_weight_model(AR,S,m,p,t,spar_outer_diameter):
     #This is not CSDL'd at the moment bc im hoping to simplify it.
-    b = m.sqrt(AR*S) #ft
-    c = b/AR #ft
+    b = m.sqrt(AR*S) #ft #This should be a csdl variable at this point, check that.
+    c = b/AR #ft #This should be a csdl variable at this point, check that.
 
     m = 0.01*m  # maximum camber in % of chord
     p = 0.10*p  # maximum camber position in tenths of chord
@@ -552,6 +523,9 @@ def wing_weight_model(AR,S,m,p,t,spar_outer_diameter):
     upper = csdlTrapIntegrator(xu,yu)
     lower = csdlTrapIntegrator(xl,yl)
 
+    upperNP = np.trapz(yu,xu)
+    lowerNP = n.trapz(yl,xl)
+
     total_area = upper + -(lower)
 
     foam_density = 1.5 #lb/ft**3 #This is an aproximation to get the code working
@@ -567,11 +541,11 @@ def csdlTrapIntegrator(x,y): #I have no idea if this works correctly
         raise ValueError("X data and Y data must have same length")
     #integral = csdl.Variable(shape = (1,0) name = 'Area of Airfoil', value = 0)
     integral = 0
+    integral = csdl.Variable(shape=(1,),name="Airfoil_Area",value = integral)
     for i in range(len(x) - 1):
         integral = integral + (x[i+1] - x[i]) * (y[i] + y[i+1]) / 2.0
     return integral
 
-    
 def define_analysis(caddee: cd.CADDEE):
     do_lpc_analysis = False
     if do_lpc_analysis:
@@ -618,7 +592,7 @@ def define_analysis(caddee: cd.CADDEE):
         total_lift = vlm_outputs_1.total_lift * -1
         
         #mark2_weight = aircraft.quantities.mass_properties.mass
-        mark2_weight = 6
+        mark2_weight = csdl.Variable(value=6,name="Gross Weight",shape = (1,))
 
         lift_constraint = total_lift - mark2_weight
         lift_constraint.name = "lift_equals_weight_constraint"
@@ -626,7 +600,9 @@ def define_analysis(caddee: cd.CADDEE):
 
         # set objectives and constraints
         total_induced_drag.name = "total_induced_drag"
-        #total_induced_drag.set_as_objective(scaler=1e-2)
+        #thrust = -total_induced_drag
+        
+        total_induced_drag.set_as_objective(scaler=1e-2)
 
         #do_structural_sizing = True
         if do_structural_sizing:
@@ -653,7 +629,8 @@ def define_analysis(caddee: cd.CADDEE):
     # cruise
     cruise = conditions["cruise"]
     cruise_pusher_rotor_power = csdl.Variable(name="cruise_pusher_power",shape=(1,), value = 223) #W
-    cruise_pusher_rotor_power.set_as_design_variable(upper=355, lower=0, scaler=1e-3) #is this a good scaler?
+    cruise_pusher_rotor_power.set_as_constraint(upper=355, lower=0, scaler=1e-3) #is this a good scaler?
+    #Should this be a constraint or a design variable?
 
     total_power = cruise_pusher_rotor_power / 0.95 #effciency factor?
     mission_time = cruise_time
@@ -664,331 +641,7 @@ def define_analysis(caddee: cd.CADDEE):
     ## We have constant mission range. Shoulnd't vortexAD inform power required for cruise at specified velocity?
 
     #SET AS OBJECTIVVEEEEE
-    ER.set_as_objective()
-
-def define_plus_5g(plus_5g):
-    plus_5g_config = plus_5g.configuration
-    mesh_container = plus_5g_config.mesh_container
-    aircraft = plus_5g_config.system
-    wing = aircraft.comps["wing"]
-    v_tail = aircraft.comps["v_tail"]
-    boomFR = aircraft.comps["boomFR"]
-    boomBR = aircraft.comps["boomBR"]
-    boomFL = aircraft.comps["boomFL"]
-    boomBL = aircraft.comps["boomBL"]
-
-
-    # Actuate tail #Do we need to do this, we're not optimizing trim?
-    tail = aircraft.comps["h_tail"]
-    elevator_deflection = csdl.Variable(name="plus_5g_elevator", shape=(1, ), value=0)
-    elevator_deflection.set_as_design_variable(lower=np.deg2rad(-20), upper=np.deg2rad(20), scaler=10)
-    tail.actuate(elevator_deflection)
-
-    # Re-evaluate meshes and compute nodal velocities
-    plus_5g.finalize_meshes()
-
-    # Set up VLM analysis
-    vlm_mesh = mesh_container["vlm_mesh"]
-    wing_lattice = vlm_mesh.discretizations["wing_chord_surface"]
-    tail_lattice = vlm_mesh.discretizations["tail_chord_surface"]
-    airfoil_upper_nodes = wing_lattice._airfoil_upper_para
-    airfoil_lower_nodes = wing_lattice._airfoil_lower_para
-    pressure_indexed_space : lfs.FunctionSetSpace = wing.quantities.pressure_space
-
-    # run vlm solver
-    lattice_coordinates = [wing_lattice.nodal_coordinates, tail_lattice.nodal_coordinates]
-    lattice_nodal_velocitiies = [wing_lattice.nodal_velocities, tail_lattice.nodal_velocities]
-    
-     # Add an airfoil model
-    nasa_langley_airfoil_maker = ThreeDAirfoilMLModelMaker(
-        airfoil_name="ls417",
-            aoa_range=np.linspace(-12, 16, 50), 
-            reynolds_range=[1e5, 2e5, 5e5, 1e6, 2e6, 4e6, 7e6, 10e6], 
-            mach_range=[0., 0.2, 0.3, 0.4, 0.5, 0.6],
-    )
-    Cl_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["Cl"])
-    Cd_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["Cd"])
-    Cp_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["Cp"])
-    alpha_stall_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["alpha_Cl_min_max"])
-    
-    #Testing not using lsdo airfoil
-    Cl_model = None
-    Cp_model = None
-    vlm_outputs = vlm_solver(
-        lattice_coordinates, 
-        lattice_nodal_velocitiies, 
-        atmos_states=plus_5g.quantities.atmos_states,
-        airfoil_Cd_models=[None, None],#=airfoil_Cd_models,
-        airfoil_Cl_models=[Cl_model, None],
-        airfoil_Cp_models=[Cp_model, None],
-        airfoil_alpha_stall_models=[alpha_stall_model, None],
-    )
-    
-    vlm_forces = vlm_outputs.total_force
-    vlm_moments = vlm_outputs.total_moment
-    
-    if True:
-        V_inf = plus_5g.parameters.speed
-        rho_inf = plus_5g.quantities.atmos_states.density
-        spanwise_Cp = vlm_outputs.surface_spanwise_Cp[0]
-        spanwise_pressure = spanwise_Cp * 0.5 * rho_inf * V_inf**2
-        spanwise_pressure = csdl.blockmat([[spanwise_pressure[0, :, 0:120].T()], [spanwise_pressure[0, :, 120:].T()]])
-        
-        pressure_function = pressure_indexed_space.fit_function_set(
-            values=spanwise_pressure.reshape((-1, 1)), parametric_coordinates=airfoil_upper_nodes+airfoil_lower_nodes,
-            regularization_parameter=1e-4,
-        )
-
-        if recorder.inline is True:
-            wing.geometry.plot_but_good(color=pressure_function)
-        box_beam_mesh = mesh_container["beam_mesh"]
-        box_beam = box_beam_mesh.discretizations["wing_box_beam"]
-        beam_nodes = box_beam.nodal_coordinates
-
-        right_wing_inds = list(wing.quantities.right_wing_geometry.functions)
-        force_magnitudes, force_para_coords = pressure_function.integrate(wing.geometry, grid_n=30, indices=right_wing_inds)
-        force_magnitudes:csdl.Variable = force_magnitudes.flatten()
-        force_coords = wing.geometry.evaluate(force_para_coords)
-        force_normals = wing.geometry.evaluate_normals(force_para_coords)
-        force_vectors = force_normals*csdl.expand(force_magnitudes, force_normals.shape, 'i->ij')
-
-        mapper = acu.NodalMap()
-        force_map = mapper.evaluate(force_coords, beam_nodes.reshape((-1, 3)))
-        beam_forces = force_map.T() @ force_vectors
-
-        beam_forces_plus_moments = csdl.Variable(shape=(beam_forces.shape[0], 6), value=0)
-        beam_forces_plus_moments = beam_forces_plus_moments.set(
-            csdl.slice[:, 0:3], beam_forces
-        )
-
-        # set up beam analysis
-        beam: af.Beam = wing.quantities.beam
-        beam.add_boundary_condition(node=0, dof=[1, 1, 1, 1, 1, 1])
-        beam.add_load(beam_forces_plus_moments)
-
-        frame = af.Frame()
-        frame.add_beam(beam)
-
-        struct_solution = frame.evaluate()
-
-        beam_displacement = struct_solution.get_displacement(beam)
-        beam_bkl_top = struct_solution.get_bkl(beam)["top"]
-        beam_bkl_bot = struct_solution.get_bkl(beam)["bot"]
-        beam_bkl_bot.name = "bottom_buckling_plus_5g"
-        beam_bkl_top.name = "top_buckling_plus_5g"
-        beam_bkl_bot.set_as_constraint(upper=1.)
-        beam_bkl_top.set_as_constraint(upper=1.)
-        # beam_stress = csdl.maximum(struct_solution.get_stress(beam))
-        # # max_stress_csdl = csdl.maximum(beam_stress)
-        # beam_stress.name = "max_stress"
-        # beam_stress.set_as_constraint(upper=max_stress, scaler=1e-8)
-
-    # Drag build-up
-    drag_build_up_model = cd.aircraft.models.aero.compute_drag_build_up
-
-    drag_build_up = drag_build_up_model(plus_5g.quantities.ac_states, plus_5g.quantities.atmos_states,
-                                        wing.parameters.S_ref, [wing, tail, v_tail])
-
-    #Not using BEM, we don't need it to be able to sustain a 5g maneuver, just survive it
-
-    # # BEM solver
-    # rotor_meshes = mesh_container["rotor_meshes"]
-    # pusher_rotor_mesh = rotor_meshes.discretizations["pusher_prop_mesh"]
-    # mesh_vel = pusher_rotor_mesh.nodal_velocities
-    # plus_5g_rpm = csdl.Variable(name="plus_5g_pusher_rpm", shape=(1, ), value=1883.73389999)
-    # plus_5g_rpm.set_as_design_variable(upper=3000, lower=1200, scaler=1e-3)
-    # bem_inputs = RotorAnalysisInputs()
-    # bem_inputs.ac_states = plus_5g.quantities.ac_states
-    # bem_inputs.atmos_states =  plus_5g.quantities.atmos_states
-    # bem_inputs.mesh_parameters = pusher_rotor_mesh
-    # bem_inputs.mesh_velocity = mesh_vel
-    # bem_inputs.rpm = plus_5g_rpm
-    # bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
-    # bem_outputs = bem_model.evaluate(bem_inputs)
-    # plus_5g_power["pusher_prop"] = bem_outputs.total_power
-    # plus_5g.quantities.rotor_power_dict = plus_5g_power
-
-    # total forces and moments
-    total_forces_plus_5g, total_moments_plus_5g = plus_5g.assemble_forces_and_moments(
-        aero_propulsive_forces=[vlm_forces, drag_build_up,], 
-        aero_propulsive_moments=[vlm_moments], 
-        load_factor=3,
-    )
-
-    # eomm #now what is this
-    eom_model = cd.aircraft.models.eom.SixDofEulerFlatEarthModel()
-    accel_plus_5g = eom_model.evaluate(
-        total_forces=total_forces_plus_5g,
-        total_moments=total_moments_plus_5g,
-        ac_states=plus_5g.quantities.ac_states,
-        ac_mass_properties=plus_5g_config.system.quantities.mass_properties
-    )
-    accel_norm_plus_5g = accel_plus_5g.accel_norm
-    accel_norm_plus_5g.name = "plus_5g_trim"
-    accel_norm_plus_5g.set_as_constraint(upper=0, lower=0, scaler=4) #is this how we set the strucutral sizing condition?
-    
-    return accel_plus_5g, total_forces_plus_5g, total_moments_plus_5g
-
-def define_minus_3g(minus_3g):
-    minus_3g_config = minus_3g.configuration
-    mesh_container = minus_3g_config.mesh_container
-    aircraft = minus_3g_config.system
-    wing = aircraft.comps["wing"]
-    v_tail = aircraft.comps["v_tail"]
-    rotors = aircraft.comps["rotors"]
-    booms = list(aircraft.comps["booms"].comps.values())
-
-    # Actuate tail
-    tail = aircraft.comps["h_tail"]
-    elevator_deflection = csdl.Variable(name="minus_3g_elevator", shape=(1, ), value=0.)
-    elevator_deflection.set_as_design_variable(lower=np.deg2rad(-20), upper=np.deg2rad(20), scaler=10)
-    tail.actuate(elevator_deflection)
-
-    # Re-evaluate meshes and compute nodal velocities
-    minus_3g.finalize_meshes()
-
-    # Set up VLM analysis
-    vlm_mesh = mesh_container["vlm_mesh"]
-    wing_lattice = vlm_mesh.discretizations["wing_chord_surface"]
-    tail_lattice = vlm_mesh.discretizations["tail_chord_surface"]
-    airfoil_upper_nodes = wing_lattice._airfoil_upper_para
-    airfoil_lower_nodes = wing_lattice._airfoil_lower_para
-    pressure_indexed_space : lfs.FunctionSetSpace = wing.quantities.pressure_space
-
-    # run vlm solver
-    lattice_coordinates = [wing_lattice.nodal_coordinates, tail_lattice.nodal_coordinates]
-    lattice_nodal_velocitiies = [wing_lattice.nodal_velocities, tail_lattice.nodal_velocities]
-    
-     # Add an airfoil model
-    nasa_langley_airfoil_maker = ThreeDAirfoilMLModelMaker(
-        airfoil_name="ls417",
-            aoa_range=np.linspace(-12, 16, 50), 
-            reynolds_range=[1e5, 2e5, 5e5, 1e6, 2e6, 4e6, 7e6, 10e6], 
-            mach_range=[0., 0.2, 0.3, 0.4, 0.5, 0.6],
-    )
-    Cl_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["Cl"])
-    Cd_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["Cd"])
-    Cp_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["Cp"])
-    alpha_stall_model = nasa_langley_airfoil_maker.get_airfoil_model(quantities=["alpha_Cl_min_max"])
-    
-    Cp_model = None
-    Cl_model = None
-    vlm_outputs = vlm_solver(
-        lattice_coordinates, 
-        lattice_nodal_velocitiies, 
-        atmos_states=minus_3g.quantities.atmos_states,
-        airfoil_Cd_models=[None, None],#=airfoil_Cd_models,
-        airfoil_Cl_models=[Cl_model, None],
-        airfoil_Cp_models=[Cp_model, None],
-        airfoil_alpha_stall_models=[alpha_stall_model, None],
-    )
-    
-    vlm_forces = vlm_outputs.total_force
-    vlm_moments = vlm_outputs.total_moment
-    
-    if True:
-        V_inf = minus_3g.parameters.speed
-        rho_inf = minus_3g.quantities.atmos_states.density
-        spanwise_Cp = vlm_outputs.surface_spanwise_Cp[0]
-        spanwise_pressure = spanwise_Cp * 0.5 * rho_inf * V_inf**2
-        spanwise_pressure = csdl.blockmat([[spanwise_pressure[0, :, 0:120].T()], [spanwise_pressure[0, :, 120:].T()]])
-        
-        pressure_function = pressure_indexed_space.fit_function_set(
-            values=spanwise_pressure.reshape((-1, 1)), parametric_coordinates=airfoil_upper_nodes+airfoil_lower_nodes,
-            regularization_parameter=1e-4,
-        )
-
-        # wing.geometry.plot_but_good(color=pressure_function)
-
-        box_beam_mesh = mesh_container["beam_mesh"]
-        box_beam = box_beam_mesh.discretizations["wing_box_beam"]
-        beam_nodes = box_beam.nodal_coordinates
-
-        right_wing_inds = list(wing.quantities.right_wing_geometry.functions)
-        force_magnitudes, force_para_coords = pressure_function.integrate(wing.geometry, grid_n=30, indices=right_wing_inds)
-        force_magnitudes:csdl.Variable = force_magnitudes.flatten()
-        force_coords = wing.geometry.evaluate(force_para_coords)
-        force_normals = wing.geometry.evaluate_normals(force_para_coords)
-        force_vectors = force_normals*csdl.expand(force_magnitudes, force_normals.shape, 'i->ij')
-
-        mapper = acu.NodalMap()
-        force_map = mapper.evaluate(force_coords, beam_nodes.reshape((-1, 3)))
-        beam_forces = force_map.T() @ force_vectors
-
-        beam_forces_plus_moments = csdl.Variable(shape=(beam_forces.shape[0], 6), value=0)
-        beam_forces_plus_moments = beam_forces_plus_moments.set(
-            csdl.slice[:, 0:3], beam_forces
-        )
-
-        # set up beam analysis
-        beam: af.Beam = wing.quantities.beam
-        beam.add_boundary_condition(node=0, dof=[1, 1, 1, 1, 1, 1])
-        beam.add_load(beam_forces_plus_moments)
-
-        frame = af.Frame()
-        frame.add_beam(beam)
-
-        struct_solution = frame.evaluate()
-
-        beam_displacement = struct_solution.get_displacement(beam)
-        beam_bkl_top = struct_solution.get_bkl(beam)["top"]
-        beam_bkl_bot = struct_solution.get_bkl(beam)["bot"]
-        beam_bkl_top.name = "top_buckling_minus_3g"
-        beam_bkl_bot.name = "bottom_buckling_minus_3g"
-        beam_bkl_top.set_as_constraint(upper=1.)
-        beam_bkl_bot.set_as_constraint(upper=1.)
-        
-        # beam_stress = csdl.maximum(struct_solution.get_stress(beam))
-        # # max_stress_csdl = csdl.maximum(beam_stress)
-        # beam_stress.name = "max_stress_minus_3g"
-        # beam_stress.set_as_constraint(upper=max_stress, scaler=1e-8)
-
-    # Drag build-up
-    drag_build_up_model = cd.aircraft.models.aero.compute_drag_build_up
-
-    drag_build_up = drag_build_up_model(minus_3g.quantities.ac_states, minus_3g.quantities.atmos_states,
-                                        wing.parameters.S_ref, [wing, tail, v_tail, rotors] + booms)
-    
-    
-    minus_3g_power = {}
-
-    # # BEM solver
-    # rotor_meshes = mesh_container["rotor_meshes"]
-    # pusher_rotor_mesh = rotor_meshes.discretizations["pusher_prop_mesh"]
-    # mesh_vel = pusher_rotor_mesh.nodal_velocities
-    # minus_3g_rpm = csdl.Variable(name="minus_3g_pusher_rpm", shape=(1, ), value=2000)
-    # minus_3g_rpm.set_as_design_variable(upper=3000, lower=1200, scaler=1e-3)
-    # bem_inputs = RotorAnalysisInputs()
-    # bem_inputs.ac_states = minus_3g.quantities.ac_states
-    # bem_inputs.atmos_states =  minus_3g.quantities.atmos_states
-    # bem_inputs.mesh_parameters = pusher_rotor_mesh
-    # bem_inputs.mesh_velocity = mesh_vel
-    # bem_inputs.rpm = minus_3g_rpm
-    # bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
-    # bem_outputs = bem_model.evaluate(bem_inputs)
-    # minus_3g_power["pusher_prop"] = bem_outputs.total_power
-    # minus_3g.quantities.rotor_power_dict = minus_3g_power
-
-    # total forces and moments
-    total_forces_minus_3g, total_moments_minus_3g = minus_3g.assemble_forces_and_moments(
-        aero_propulsive_forces=[vlm_forces, drag_build_up], 
-        aero_propulsive_moments=[vlm_moments], 
-        load_factor=-1,
-    )
-
-    # eom
-    eom_model = cd.aircraft.models.eom.SixDofEulerFlatEarthModel()
-    accel_minus_3g = eom_model.evaluate(
-        total_forces=total_forces_minus_3g,
-        total_moments=total_moments_minus_3g,
-        ac_states=minus_3g.quantities.ac_states,
-        ac_mass_properties=minus_3g_config.system.quantities.mass_properties
-    )
-    accel_norm_minus_3g = accel_minus_3g.accel_norm
-    accel_norm_minus_3g.name = "minus_3g_trim"
-    accel_norm_minus_3g.set_as_constraint(upper=0, lower=0, scaler=4)
-    
-    return accel_minus_3g, total_forces_minus_3g, total_moments_minus_3g
+    #ER.set_as_objective()
 
 if __name__ == "__main__": #I like doing this because it makes it clear where the main executiom begins and also I can collapse it : )
     # Run the code (forward evaluation)
