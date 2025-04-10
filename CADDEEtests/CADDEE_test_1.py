@@ -10,6 +10,12 @@ import lsdo_function_spaces as lfs
 import aframe as af
 import aeroelastic_coupling_utils as acu
 import os #for relative path import
+import math as mth
+from BladeAD.core.airfoil.ml_airfoil_models.NACA_4412.naca_4412_model import NACA4412MLAirfoilModel
+from BladeAD.utils.parameterization import BsplineParameterization
+from BladeAD.core.BEM.bem_model import BEMModel
+from BladeAD.core.pitt_peters.pitt_peters_model import PittPetersModel
+from BladeAD.utils.var_groups import RotorAnalysisInputs, RotorMeshParameters
 units = Units()
 
 #TO DO
@@ -98,20 +104,9 @@ def define_base_config(caddee : cd.CADDEE):
         tip_twist_delta=wing_tip_twist, 
         geometry=wing_geometry
     )
-
+    
     # Wing spar material
     carbon_fiber = af.Material(name='carbon_fiber',E=96.2E9, G = 3.16E9, density = 1420)
-
-    # Function spaces DO WE NEED THESE?
-    # Thickness
-    thickness_space = wing_geometry.create_parallel_space(lfs.ConstantSpace(2))
-    thickness_var, thickness_function = thickness_space.initialize_function(1, value=0.005)
-    wing.quantities.material_properties.set_material(carbon_fiber, thickness=None)
-
-    # Pressure space
-    pressure_function_space = lfs.IDWFunctionSpace(num_parametric_dimensions=2, order=6, grid_size=(120, 20), conserve=False, n_neighbors=10)
-    indexed_pressue_function_space = wing.geometry.create_parallel_space(pressure_function_space)
-    wing.quantities.pressure_space = indexed_pressue_function_space
 
     # Aerodynamic parameters for drag build up
     wing.quantities.drag_parameters.percent_laminar = 70
@@ -256,11 +251,10 @@ def define_conditions(caddee: cd.CADDEE):
         altitude=0,
         range=100,
         pitch_angle=pitch_angle,
-        mach_number=0.06,
+        speed=21.336,
     )
     cruise.configuration = base_config.copy()
     conditions["cruise"] = cruise
-
 
 def define_mass_properties(caddee : cd.CADDEE):
     """Define vehicle-level mass properties of the base configuration."""
@@ -407,13 +401,13 @@ def define_mass_properties(caddee : cd.CADDEE):
         AR=wing.parameters.AR
 
         spar_OD = 0.25 #??? I think I need to make a spar componet in CADDEE first?
-        wing_weight = wing_weight_model(AR,S_ref,4,4,12,spar_OD)
+        wing_weight = wing_weight_model(AR,S_ref,csdl.Variable(value=4),csdl.Variable(value=4),csdl.Variable(value=12),spar_outer_diameter=spar_OD)
 
         # fuselage mass CONST
         fuselage_weight = 3
 
         # h tail mass
-        h_tail_weight = wing_weight_model(h_tail.AR,h_tail.S,0,0,12,0)
+        h_tail_weight = wing_weight_model(h_tail.AR,h_tail.S,csdl.Variable(value=0),csdl.Variable(value=0),csdl.Variable(value = 12),csdl.Variable(value=0))
 
         # v tail mass
         v_tail_weight = 0.1
@@ -470,33 +464,40 @@ def define_mass_properties(caddee : cd.CADDEE):
             # Get base config and conditions
 
 def wing_weight_model(AR,S,m,p,t,spar_outer_diameter):
-    #This is not CSDL'd at the moment bc im hoping to simplify it.
-    b = m.sqrt(AR*S) #ft #This should be a csdl variable at this point, check that.
+    #All inputs need to be CSDL variables!
+    b = csdl.sqrt(AR*S) #ft #This should be a csdl variable at this point, check that.
     c = b/AR #ft #This should be a csdl variable at this point, check that.
 
-    m = 0.01*m  # maximum camber in % of chord
-    p = 0.10*p  # maximum camber position in tenths of chord
-    t = 0.01*t  # thickness in % of chord
+    m_adjusted = 0.01*m  # maximum camber in % of chord # These should be CSDL variables as well
+    p_adjusted = 0.10*p  # maximum camber position in tenths of chord
+    t_adjusted = 0.01*t  # thickness in % of chord
 
     # Coefficients for 4 digit series
-    a0 =  1.4845
-    a1 = -0.6300
-    a2 = -1.7580
-    a3 =  1.4215
-    a4 = -0.5075
+    a0 =  csdl.Variable(value=1.4845)
+    a1 = csdl.Variable(value=-0.6300)
+    a2 = csdl.Variable(value=-1.7580)
+    a3 =  csdl.Variable(value=1.4215)
+    a4 = csdl.Variable(value=-0.5075)
 
-    n = 1000 # number of points along the chord
-    x = np.linspace(0,c,n) # x coordinate of points along the chord
-    y   = np.zeros(n) # x coordinate of points along the chord
-    yc  = np.zeros(n) # y coordinate of the camber line
-    dyc = np.zeros(n) # gradient of the camber line
-    yt  = np.zeros(n) # thickness distribution
-    xu  = np.zeros(n) # x coordinate of the upper surface
-    yu  = np.zeros(n) # y coordinate of the upper surface
-    xl  = np.zeros(n) # x coordinate of the lower surface
-    yl  = np.zeros(n) # y coordinate of the lower surface
+    n = 15 # number of points along the chord
+    x_vals = np.linspace(0,c.value,n) # x coordinate of points along the chord
+    x = csdl.Variable(value=x_vals,name="Wing_Weight_Model_X_Values")
+    yc_vals  = np.zeros(n) # y coordinate of the camber line
+    yc = csdl.Variable(shape =(n,),value=yc_vals,name="Wing_Weight_Model_YC_Values")
+    dyc_vals = np.zeros(n) # gradient of the camber line
+    dyc = csdl.Variable(shape =(n,),value=dyc_vals,name="Wing_Weight_Model_DYC_Values")
+    yt_vals  = np.zeros(n) # thickness distribution
+    yt = csdl.Variable(shape =(n,),value=yt_vals,name="Wing_Weight_Model_YT_Values")
+    xu_vals  = np.zeros(n) # x coordinate of the upper surface
+    xu = csdl.Variable(shape =(n,),value=xu_vals,name="Wing_Weight_Model_XU_Values")
+    yu_vals  = np.zeros(n) # y coordinate of the upper surface
+    yu = csdl.Variable(shape =(n,),value=yu_vals,name="Wing_Weight_Model_YU_Values")
+    xl_vals  = np.zeros(n) # x coordinate of the lower surface
+    xl = csdl.Variable(shape =(n,),value=xl_vals,name="Wing_Weight_Model_XL_Values")
+    yl_vals  = np.zeros(n) # y coordinate of the lower surface
+    yl = csdl.Variable(shape =(n,),value=yl_vals,name="Wing_Weight_Model_YL_Values")
     for i in range(n):
-        if  (x[i]/c < p):
+        if  (x[i].value/c.value < p.value):
             yc[i]  = (c*m/p**2)*(2*p*(x[i]/c)-(x[i]/c)**2)
             dyc[i] = ((2*m)/p**2)*(p-(x[i]/c))
         else:
@@ -511,6 +512,9 @@ def wing_weight_model(AR,S,m,p,t,spar_outer_diameter):
         yu[i] = yc[i] + yt[i]*m.cos(teta)
         yl[i] = yc[i] - yt[i]*m.cos(teta)
 
+    # for i in range(n):
+    #     if ()
+
 
     # plot.xlim(-0.2,c+0.2)
     # plot.ylim(-c/3,c/3)
@@ -523,12 +527,12 @@ def wing_weight_model(AR,S,m,p,t,spar_outer_diameter):
     upper = csdlTrapIntegrator(xu,yu)
     lower = csdlTrapIntegrator(xl,yl)
 
-    upperNP = np.trapz(yu,xu)
-    lowerNP = n.trapz(yl,xl)
+    # upperNP = np.trapz(yu,xu)
+    # lowerNP = n.trapz(yl,xl)
 
     total_area = upper + -(lower)
 
-    foam_density = 1.5 #lb/ft**3 #This is an aproximation to get the code working
+    foam_density = csdl.Variable(value=1.5) #lb/ft**3 #This is an aproximation to get the code working
     volume_wing = total_area * b
     volume_spars = 2*m.pi*(spar_outer_diameter/2/12)**2*b #Volume of both spars in ft^3, spar outer diamter in in^3
     volume_total = volume_wing-volume_spars
@@ -547,87 +551,115 @@ def csdlTrapIntegrator(x,y): #I have no idea if this works correctly
     return integral
 
 def define_analysis(caddee: cd.CADDEE):
-    do_lpc_analysis = False
-    if do_lpc_analysis:
-        # #Below is the more regirmented, ex_lpc.py method of doing analysis
-        conditions = caddee.conditions
-        base_config = caddee.base_configuration
-        base_mps = base_config.system.quantities.mass_properties
+    conditions = caddee.conditions
+    cruise = caddee.conditions["cruise"]
+    cruise_config = cruise.configuration
+    mesh_container = cruise_config.mesh_container
+    base_config = caddee.base_configuration
+    aircraft = base_config.system
 
-    #Below is the less regimented way of doing analysis from induced drag example.
-    if do_lpc_analysis != True:
-        conditions = caddee.conditions
-        cruise = caddee.conditions["cruise"]
-        cruise_config = cruise.configuration
-        mesh_container = cruise_config.mesh_container
-        base_config = caddee.base_configuration
-        aircraft = base_config.system
+    # Cruise stuff
+    # Re-evaluate meshes and compute nodal velocities
+    cruise.finalize_meshes()
 
-        # Re-evaluate meshes and compute nodal velocities
-        cruise.finalize_meshes()
+    # Make an instance of an airfoil model
+    vlm_mesh_0 = mesh_container["vlm_mesh_0"]
+    wing_chord_surface = vlm_mesh_0.discretizations["wing_chord_surface"]
+    h_tail_chord_surface = vlm_mesh_0.discretizations["h_tail_chord_surface"]
 
-        # Make an instance of an airfoil model
-        vlm_mesh_0 = mesh_container["vlm_mesh_0"]
-        wing_chord_surface = vlm_mesh_0.discretizations["wing_chord_surface"]
-        h_tail_chord_surface = vlm_mesh_0.discretizations["h_tail_chord_surface"]
+    lattice_coordinates = [wing_chord_surface.nodal_coordinates, h_tail_chord_surface.nodal_coordinates]
+    lattice_nodal_velocities = [wing_chord_surface.nodal_velocities, h_tail_chord_surface.nodal_velocities]
 
-        lattice_coordinates = [wing_chord_surface.nodal_coordinates, h_tail_chord_surface.nodal_coordinates]
-        lattice_nodal_velocities = [wing_chord_surface.nodal_velocities, h_tail_chord_surface.nodal_velocities]
+    vlm_outputs_1 = vlm_solver(
+        lattice_coordinates, 
+        lattice_nodal_velocities, 
+        atmos_states=cruise.quantities.atmos_states,
+        airfoil_Cd_models=[None, None],
+        airfoil_Cl_models=[None, None],
+        airfoil_Cp_models=[None, None],
+        airfoil_alpha_stall_models=[None, None],
+    )
 
 
-        #Airfoil is causing issues, what if we dont pass vlm the cl model???
-        Cl_model = None
-        vlm_outputs_1 = vlm_solver(
-            lattice_coordinates, 
-            lattice_nodal_velocities, 
-            atmos_states=cruise.quantities.atmos_states,
-            airfoil_Cd_models=[None, None],
-            airfoil_Cl_models=[Cl_model, None],
-            airfoil_Cp_models=[None, None],
-            airfoil_alpha_stall_models=[None, None],
-        )
+    vlm_forces = vlm_outputs_1.total_force
+    vlm_moments = vlm_outputs_1.total_moment
 
-        # We multiply by (-1) since the lift and drag are w.r.t. the flight-dynamics reference frame
-        total_induced_drag = vlm_outputs_1.total_drag * -1
-        total_lift = vlm_outputs_1.total_lift * -1
-        
-        #mark2_weight = aircraft.quantities.mass_properties.mass
-        mark2_weight = csdl.Variable(value=6,name="Gross Weight",shape = (1,))
+    # We multiply by (-1) since the lift and drag are w.r.t. the flight-dynamics reference frame
+    total_induced_drag = vlm_outputs_1.total_drag * -1
+    total_lift = vlm_outputs_1.total_lift * -1
 
-        lift_constraint = total_lift - mark2_weight
-        lift_constraint.name = "lift_equals_weight_constraint"
-        lift_constraint.set_as_constraint(equals=0., scaler=1e-3)
+    #Do strucutal sizing and weights model? Update structure and weights?
+    
+    #BEM STUFF, not using qst (quasi-steady transition)
+    # Drag build-up
+    drag_build_up_model = cd.aircraft.models.aero.compute_drag_build_up
 
-        # set objectives and constraints
-        total_induced_drag.name = "total_induced_drag"
-        #thrust = -total_induced_drag
-        
-        total_induced_drag.set_as_objective(scaler=1e-2)
+    wing = aircraft.comps["wing"]
+    fuselage = aircraft.comps["fuselage"]
+    tail = aircraft.comps["tail"]
+    v_tail = aircraft.comps['v_tail']
+    booms = aircraft.comps["booms"]
+    drag_build_up = drag_build_up_model(cruise.quantities.ac_states, cruise.quantities.atmos_states,
+                                        wing.parameters.S_ref, [wing, fuselage, tail, v_tail] + booms)
+    
+    cruise_power = {}
 
-        #do_structural_sizing = True
-        if do_structural_sizing:
-            plus_5g = conditions["plus_5g"]
-            accel_plus_5g, total_forces_plus_5g, total_moments_plus_5g = define_plus_5g(plus_5g)
-            
-            minus_3g = conditions["minus_3g"]
-            accel_minus_3g, total_forces_minus_3g, total_moments_minus_3g = define_minus_3g(minus_3g)
+    # BEM solver
+    rotor_meshes = mesh_container["rotor_meshes"] #add these
+    pusher_rotor_mesh = rotor_meshes.discretizations["pusher_prop_mesh"] #add these
+    mesh_vel = pusher_rotor_mesh.nodal_velocities
+    cruise_rpm = csdl.Variable(name="cruise_pusher_rpm", shape=(1, ), value=1200) #check this
+    cruise_rpm.set_as_design_variable(upper=2500, lower=1200, scaler=1e-3) #and this
+    bem_inputs = RotorAnalysisInputs()
+    bem_inputs.ac_states = cruise.quantities.ac_states
+    bem_inputs.atmos_states =  cruise.quantities.atmos_states
+    bem_inputs.mesh_parameters = pusher_rotor_mesh
+    bem_inputs.mesh_velocity = mesh_vel
+    bem_inputs.rpm = cruise_rpm
+    bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
+    bem_outputs = bem_model.evaluate(bem_inputs)
+    cruise_power["pusher_prop"] = bem_outputs.total_power
+    cruise.quantities.power = cruise_power
 
-        #Now we need to use these total forces, accelerations, and moments to do aframe?
+    # total forces and moments
+    total_forces_cruise, total_moments_cruise = cruise.assemble_forces_and_moments(
+        [vlm_forces, drag_build_up, bem_outputs.forces], [vlm_moments, bem_outputs.moments]
+    )
+
+    # eom
+    eom_model = cd.aircraft.models.eom.SixDofEulerFlatEarthModel()
+    accel_cruise = eom_model.evaluate(
+        total_forces=total_forces_cruise,
+        total_moments=total_moments_cruise,
+        ac_states=cruise.quantities.ac_states,
+        ac_mass_properties=cruise_config.system.quantities.mass_properties
+    )
+    accel_norm_cruise = accel_cruise.accel_norm
+    accel_norm_cruise.name = "cruise_trim"
+
+    #This is how the trim residual is set I think????
+    accel_norm_cruise.set_as_constraint(upper=0, lower=0, scaler=4)
+    
+    # #OLD BAD TRIM RESIDUAL
+    # #mark2_weight = aircraft.quantities.mass_properties.mass
+    # mark2_weight = csdl.Variable(value=6,name="Gross Weight",shape = (1,))
+
+    # #This is like a very basic trim residual, do a better one!!!!
+    # lift_constraint = total_lift - mark2_weight
+    # lift_constraint.name = "lift_equals_weight_constraint"
+    # lift_constraint.set_as_constraint(equals=0., scaler=1e-3)
+
+    # # set objectives and constraints
+    # total_induced_drag.name = "total_induced_drag"
+    # #thrust = -total_induced_drag
+    
+    # total_induced_drag.set_as_objective(scaler=1e-2)
 
     ########### Mission Power Analysis
-    # get rotor power for each conditions
-    # For lpc that comes out of the BEM model, but we don't want to do that.
-    # Can we say cruise power can be whatever it needs to be within a certain range to satisfy lift=weight criteria?
-    # So in lpc the pusher prop rpm is set as a design variable and BEC uses that to get power, 
-    # so I think we can say cruise power is a variable with max power as the limit
-    
-    conditions = caddee.conditions
-    cruise_veloicty = 21.336 #m/s not finalized
-    R = 10e3 #m
+    cruise_veloicty = cruise.speed
+    R = csdl.Variable(value=10e3) #m
     cruise_time = R/cruise_veloicty #s
 
-    # cruise
-    cruise = conditions["cruise"]
     cruise_pusher_rotor_power = csdl.Variable(name="cruise_pusher_power",shape=(1,), value = 223) #W
     cruise_pusher_rotor_power.set_as_constraint(upper=355, lower=0, scaler=1e-3) #is this a good scaler?
     #Should this be a constraint or a design variable?
@@ -637,6 +669,12 @@ def define_analysis(caddee: cd.CADDEE):
     mission_energy = total_power*mission_time #W-seconds
     #mission_energy.set_as_design_variable(upper = 2300,lower = 0, scaler = 1e-3)
     ER = mission_energy/R #Is this properly a csdl variable? I feel like I did this wrong lmaooo
+
+    aircraft = caddee.base_configuration.system
+    wing = aircraft.comps["wing"]
+
+    weight = wing_weight_model(wing.parameters.AR,wing.parameters.S_ref,csdl.Variable(value=4),csdl.Variable(value=4),csdl.Variable(value=12),csdl.Variable(value=0.2))
+    print(f"The calculated wing weight is {weight}")
 
     ## We have constant mission range. Shoulnd't vortexAD inform power required for cruise at specified velocity?
 
