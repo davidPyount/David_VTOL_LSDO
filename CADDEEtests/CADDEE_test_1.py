@@ -79,164 +79,254 @@ def define_base_config(caddee : cd.CADDEE):
     # instantiation configuration object and pass in system component (aircraft)
     base_config = cd.Configuration(system=aircraft)
 
-    # why isn't the fuselage component assigned to the aircraft?
-    fuselage_geometry = aircraft.create_subgeometry(search_names=["Fuselage"])
-    fuselage = cd.aircraft.components.Fuselage(length=fuselage_length, geometry=fuselage_geometry)
+    fuselage_geometry = aircraft.create_subgeometry(search_names=["Fuselage","Nosecone"])
+    fuselage_length = csdl.Variable(name="fuselage_length", value=fuse_len)
+    # fuselage_length.set_as_design_variable(lower=0.8*7.5, upper=1.2*7.5)
+    fuselage = cd.aircraft.components.Fuselage(
+        length=fuselage_length, 
+        max_height= 5/12 * ft2m,
+        max_width= 5/12 * ft2m,
+        geometry=fuselage_geometry,
+        skip_ffd = True)
+    
+    # Assign fuselage component to aircraft
     aircraft.comps["fuselage"] = fuselage
+    
+    # Treating the boom like a funky fresh fuselage. Its dimensions will change but those of the main fuselage will not
+    main_spar_geometry = aircraft.create_subgeometry(search_names=["MainSpar"])
+    main_spar_length = csdl.Variable(name="fuselage_length", value=main_spar_len)
+    main_spar_length.set_as_design_variable(lower=0.8*main_spar_len, upper=1.2*main_spar_len)
+    main_spar = cd.aircraft.components.Fuselage(
+        length=main_spar_length, 
+        # max_height= 5/12 * ft2m,
+        # max_width= 5/12 * ft2m,
+        geometry=main_spar_geometry,
+        )
+
+    # assign main spar component to aircraft
+    aircraft.comps["main_spar"] = main_spar
 
     # Make wing geometry from aircraft component and instantiate wing component
-    wing_geometry = aircraft.create_subgeometry(
-        search_names=["Wing"],
-    )
-    aspect_ratio = csdl.Variable(name="wing_aspect_ratio", value=wing_AR)
-    wing_root_twist = csdl.Variable(name="wing_root_twist", value=np.deg2rad(0))
-    wing_tip_twist = csdl.Variable(name="wing_tip_twist", value=np.deg2rad(0))
-
+    wing_geometry = aircraft.create_subgeometry(search_names=["Wing"])
+    aspect_ratio = csdl.Variable(name="wing_aspect_ratio", value = wing_AR)
+    wing_span = csdl.Variable(name="wing_span", value = wingspan)
+    wing_chord = csdl.Variable(name="wing_chord", value=wingchord)
+    wing_area = csdl.Variable(name="wing_area", value = wing_S)
+    wing_root_twist = csdl.Variable(name="wing_root_twist", value=0)
+    wing_tip_twist = csdl.Variable(name="wing_tip_twist", value=0)
+    
     # Set design variables for wing
-    aspect_ratio.set_as_design_variable(upper=1.5 * wing_AR, lower=0.5 * wing_AR, scaler=1/8)
+    # aspect_ratio.set_as_design_variable(upper=1.2 * wing_AR, lower=0.8 * wing_AR, scaler=1/8)
+    # wing_area.set_as_design_variable(upper=1.2 * wing_S, lower=0.8 * wing_S, scaler=1/16)
+    wing_span.set_as_design_variable(upper=1.5 * wingspan, lower = 0.8 * wingspan, scaler=1/8)
+    wing_chord.set_as_design_variable(upper = 1.2 * wingchord, lower = 0.8 * wingchord, scaler = 1/16)
     wing_root_twist.set_as_design_variable(upper=np.deg2rad(5), lower=np.deg2rad(-5), scaler=4)
     wing_tip_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=2)
     
-    # Are taper ratio and area held constant here? I think so they're not CSDL variables -David
     wing = cd.aircraft.components.Wing(
         AR=aspect_ratio, S_ref=wing_area, 
         taper_ratio=wing_taper, root_twist_delta=wing_root_twist,
-        tip_twist_delta=wing_tip_twist, 
-        geometry=wing_geometry
+        tip_twist_delta=wing_tip_twist, geometry=wing_geometry
     )
-    
-    # Wing spar material
-    carbon_fiber = af.Material(name='carbon_fiber',E=96.2E9, G = 3.16E9, density = 1420)
-
-    # Aerodynamic parameters for drag build up
-    wing.quantities.drag_parameters.percent_laminar = 70
-    wing.quantities.drag_parameters.percent_turbulent = 30
 
     # Assign wing component to aircraft
     aircraft.comps["wing"] = wing
 
-    # Connect wing to fuselage at the quarter chord
-    base_config.connect_component_geometries(fuselage, wing, 0.75 * wing.LE_center + 0.25 * wing.TE_center)
-    # base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center)
-
-
-    #Making hstab parameters changeable.
-    h_stab_AR = h_stab_span/h_stab_chord #why
-    h_stab_AR = csdl.Variable(name="hstab_aspect_ratio", value=h_stab_AR)
-    h_stab_root_twist = csdl.Variable(name="h_stab_root_twist", value=np.deg2rad(0))
-    h_stab_tip_twist = csdl.Variable(name="h_stab_tip_twist", value=np.deg2rad(0))
-
-    # Set design variables for wing
-    h_stab_AR.set_as_design_variable(upper=1.5 * wing_AR, lower=0.5 * wing_AR, scaler=1/8)
-    h_stab_root_twist.set_as_design_variable(upper=np.deg2rad(5), lower=np.deg2rad(-5), scaler=4)
-    h_stab_tip_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=2)
-
     # Make horizontal tail geometry & component
     h_tail_geometry = aircraft.create_subgeometry(search_names=["HStab"])
-    h_tail = cd.aircraft.components.Wing(
-        AR=h_stab_AR, S_ref=h_stab_area, taper_ratio=h_stab_taper, 
-        geometry=h_tail_geometry, root_twist_delta=h_stab_root_twist, tip_twist_delta=h_stab_tip_twist
-    )
+    h_tail_AR = csdl.Variable(name="h_tail_AR", value=h_stab_AR)
+    h_tail_area = csdl.Variable(name="h_tail_area", value=h_stab_S)
+    h_tail_span = csdl.Variable(name="wing_span", value = h_stab_span)
+    h_tail_chord = csdl.Variable(name="wing_chord", value=h_stab_chord)
+
+    h_tail_span.set_as_design_variable(lower=0.8 * h_stab_span, upper=1.5 * h_stab_span, scaler=1/4)
+    h_tail_chord.set_as_design_variable(lower=0.8 * h_stab_chord, upper=1.2 * h_stab_chord, scaler=1/4)
+    # h_tail_AR.set_as_design_variable(lower=0.8 * h_stab_AR, upper=1.5 * h_stab_AR, scaler=1/4)
+    # h_tail_area.set_as_design_variable(lower=0.8 * h_stab_S, upper=1.2 * h_stab_S, scaler=1/4)
+    h_tail = cd.aircraft.components.Wing(AR=h_tail_AR, S_ref=h_tail_area, taper_ratio=h_stab_taper, geometry=h_tail_geometry)
 
     # Assign tail component to aircraft
     aircraft.comps["h_tail"] = h_tail
-    #base_config.connect_component_geometries(fuselage, h_tail, h_tail.TE_center) #.TE_Center doesnt work for some reason
 
-    # Make vertical tail geometry & component
+    # Make vertical tail geometry & componen
     v_tail_geometry = aircraft.create_subgeometry(search_names=["VStab"])
+
+    v_tail_AR = csdl.Variable(name="v_tail_AR", value=v_stab_AR)
+    v_tail_area = csdl.Variable(name="v_tail_area", value=v_stab_S)
+
+    # v_tail_AR.set_as_design_variable(lower=0.8 * v_stab_AR, upper=1.5 * v_stab_AR, scaler=1/4)
+    # v_tail_area.set_as_design_variable(lower=0.8 * v_stab_S, upper=1.2 * v_stab_S, scaler=1/4)
+    
     v_tail = cd.aircraft.components.Wing(
-        AR=v_stab_AR, S_ref=v_stab_area, geometry=v_tail_geometry, 
+        AR=v_tail_AR, S_ref=v_tail_area, geometry=v_tail_geometry, 
         skip_ffd=True, orientation="vertical"
     )
 
     # Assign v-tail component to aircraft
     aircraft.comps["v_tail"] = v_tail
 
-    m_spar_length = csdl.Variable(name="Main Spar Length", value = main_spar_length)
-    m_spar_length.set_as_design_variable(upper= 13.716, lower=9,scaler=1e-1)
-    #Main spar
-    main_spar_geometry = aircraft.create_subgeometry(
-        search_names=["MainSpar"],
+    # lifting rotors
+    # import separately
+    fl_prop_geom = aircraft.create_subgeometry(search_names=["FrontLeftLiftRotor"])
+    fl_prop = cd.aircraft.components.Rotor(
+        radius=lift_rotor_d, geometry= fl_prop_geom, compute_surface_area=False, skip_ffd=True,
     )
-    main_spar = cd.Component(main_spar_geometry,length=main_spar_length)
-    aircraft.comps["main_spar"] = main_spar
+    aircraft.comps["fl_rotor"] = fl_prop
 
-
-    # Connect h-tail to spar?
-    base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center) #TE_center doesnt work for some reason
-    # Connect v-tail to spar?
-    #base_config.connect_component_geometries(main_spar, v_tail, v_tail.TE_center) vtail skips ffd so can we connect???
-
-    #Booms
-    #These dont have rotors at the moment. Not sure if we need, not using rotorAD
-    #Front Right
-    boom_connection_point_initial = 18/12*ft2m
-    boom_connection_point = csdl.Variable(name = 'Boom Connection Point',shape = (1,),value = boom_connection_point_initial)
-    boom_connection_point.set_as_design_variable(upper = wing_span *1.2, lower = 0.5, scaler = 1e-1) #Bounds kind of arbitrary.
-
-    boomFR_geometry = aircraft.create_subgeometry(
-        search_names=["FrontRightBoom"]
+    rl_prop_geom = aircraft.create_subgeometry(search_names=["BackLeftLiftRotor"])
+    rl_prop = cd.aircraft.components.Rotor(
+        radius=lift_rotor_d, geometry= rl_prop_geom, compute_surface_area=False, skip_ffd=True,
     )
-    boomFR = cd.Component(boomFR_geometry,length=wing_boom_length/2)
-    aircraft.comps["boom_FR"] = boomFR
-    base_config.connect_component_geometries(boomFR,wing,connection_point=(wing.LE_center+wing.TE_center)/2+boom_connection_point)
+    aircraft.comps["rl_rotor"] = rl_prop
 
-    #Back Right
-    boomBR_geometry = aircraft.create_subgeometry(
-        search_names=["BackRightBoom"]
+    fr_prop_geom = aircraft.create_subgeometry(search_names=["FrontRightLiftRotor"])
+    fr_prop = cd.aircraft.components.Rotor(
+        radius=lift_rotor_d, geometry= fr_prop_geom, compute_surface_area=False, skip_ffd=True,
     )
-    boomBR = cd.Component(boomBR_geometry,length=wing_boom_length/2)
-    aircraft.comps["boom_BR"] = boomBR
-    base_config.connect_component_geometries(boomBR,wing,connection_point=(wing.LE_center+wing.TE_center)/2+boom_connection_point)
+    aircraft.comps["fr_rotor"] = fr_prop
 
-    #Front Left
-    boomFL_geometry = aircraft.create_subgeometry(
-        search_names=["FrontLeftBoom"]
+    rr_prop_geom = aircraft.create_subgeometry(search_names=["BackRightLiftRotor"])
+    rr_prop = cd.aircraft.components.Rotor(
+        radius=lift_rotor_d, geometry= rr_prop_geom, compute_surface_area=False, skip_ffd=True,
     )
-    boomFL = cd.Component(boomFL_geometry,length=wing_boom_length/2)
-    aircraft.comps["boom_FL"] = boomFL
-    base_config.connect_component_geometries(boomFL,wing,connection_point=(wing.LE_center+wing.TE_center)/2-boom_connection_point)
+    aircraft.comps["rr_rotor"] = rr_prop
 
-    #Back Left
-    boomBL_geometry = aircraft.create_subgeometry(
-        search_names=["BackLeftBoom"]
+    lift_rotors = [fl_prop, fr_prop, rl_prop, rr_prop]
+
+    cruise_prop_geom = aircraft.create_subgeometry(search_names=["Propeller"])
+    cruise_prop = cd.aircraft.components.Rotor(
+        radius=cruise_prop_d, geometry= cruise_prop_geom, compute_surface_area=False, skip_ffd=True,
     )
-    boomBL = cd.Component(boomBL_geometry,length=wing_boom_length/2)
-    aircraft.comps["boom_BL"] = boomBL
-    base_config.connect_component_geometries(boomBL,wing,connection_point=(wing.LE_center+wing.TE_center)/2-boom_connection_point)
+    aircraft.comps["cruise_propeller"] = cruise_prop
 
-    ## MAKE MESHES
+    fl_boom_geom = aircraft.create_subgeometry(search_names = ['FrontLeftBoom'])
+    fl_boom = cd.aircraft.components.Fuselage(length=wing_boom_length/2, geometry=fl_boom_geom)
+    aircraft.comps["fl_boom"] = fl_boom
+
+    rl_boom_geom = aircraft.create_subgeometry(search_names = ['BackLeftBoom'])
+    rl_boom = cd.aircraft.components.Fuselage(length=wing_boom_length/2, geometry=rl_boom_geom)
+    aircraft.comps["rl_boom"] = rl_boom
+
+    fr_boom_geom = aircraft.create_subgeometry(search_names = ['FrontRightBoom'])
+    fr_boom = cd.aircraft.components.Fuselage(length=wing_boom_length/2, geometry=fr_boom_geom)
+    aircraft.comps["fr_boom"] = fr_boom
+
+    rr_boom_geom = aircraft.create_subgeometry(search_names = ['BackRightBoom'])
+    rr_boom = cd.aircraft.components.Fuselage(length=wing_boom_length/2, geometry=rr_boom_geom)
+    aircraft.comps["rr_boom"] = rr_boom
+
+    # battery_geom = aircraft.create_subgeometry(search_names='Battery')
+    # battery = cd.aircraft.components.Fuselage(length=l_battery, geometry=battery_geom)
+
+    # Connect component geometries 
+    # look for examples of component connection in ex_lpc.py 
+    # wing to fuselage
+    base_config.connect_component_geometries(fuselage, wing, 0.75 * wing.LE_center + 0.25 * wing.TE_center)
+    # h-tail to spar
+    base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center)
+    # v-tail to spar
+    base_config.connect_component_geometries(main_spar, v_tail, v_tail.TE_root)
+    # cruise propeller to fuselage nose
+    base_config.connect_component_geometries(fuselage, cruise_prop, connection_point=fuselage.nose_point)
+    # lift rotors to lift booms
+    base_config.connect_component_geometries(fr_boom, fr_prop, fr_boom.nose_point)
+    base_config.connect_component_geometries(fl_boom, fl_prop, fl_boom.nose_point)
+    base_config.connect_component_geometries(rr_boom, rr_prop, rr_boom.tail_point)
+    base_config.connect_component_geometries(rl_boom, rl_prop, rl_boom.tail_point)
+    # main spar to fuselage
+    base_config.connect_component_geometries(main_spar, fuselage, main_spar.nose_point)
+    # wing booms to wing
+    base_config.connect_component_geometries(fr_boom, wing, fr_boom.tail_point)
+    base_config.connect_component_geometries(fl_boom, wing, fl_boom.tail_point)
+    base_config.connect_component_geometries(rr_boom, wing, rr_boom.nose_point)
+    base_config.connect_component_geometries(rl_boom, wing, rl_boom.nose_point)
+
+    # geometry and positioning of the "Skeleton Assembly" (which includes all landing gear, nosecone, and all avionics except battery)
+    # will not change between models so we can treat it all as one point mass
+
+    skeleton = cd.Component()
+    aircraft.comps["skeleton"] = skeleton
+
+    left_boom_assembly = cd.Component()
+    aircraft.comps["left_boom_assembly"] = left_boom_assembly
+
+    right_boom_assembly = cd.Component()
+    aircraft.comps["right_boom_assembly"] = right_boom_assembly
+
+    wing_spars = cd.Component()
+    aircraft.comps["wing_spars"] = wing_spars
+
+    cruise_motor = cd.Component()
+    aircraft.comps["cruise_motor"] = cruise_motor
+
+    wing_fuse_mount = cd.Component()
+    aircraft.comps["wing_fuse_mount"] = wing_fuse_mount
+
+    tail_mount = cd.Component()
+    aircraft.comps["tail_mount"] = tail_mount
+
+    battery = cd.Component()
+    aircraft.comps["battery"] = battery
+
     # Meshing
     mesh_container = base_config.mesh_container
 
-    # Tail 
+    # H-Tail 
     tail_chord_surface = cd.mesh.make_vlm_surface(
         wing_comp=h_tail,
         num_chordwise=1, 
-        num_spanwise=10,
+        num_spanwise=4, # ? decreased for speed, bump this up later
     )
+
+    # V-Tail
+    # ? This code does NOT work for vertical tails
+    # tail_chord_surface = cd.mesh.make_vlm_surface(
+    #     wing_comp=v_tail,
+    #     num_chordwise=1, 
+    #     num_spanwise=10,
+    # )
 
     # Wing chord surface (lifting line)
     wing_chord_surface = cd.mesh.make_vlm_surface(
         wing_comp=wing,
-        num_chordwise=16,
-        num_spanwise=30,
+        num_chordwise=3, # ? decreased for speed, bump this up later
+        num_spanwise=4,
     )
-    vlm_mesh_0 = cd.mesh.VLMMesh()
-    vlm_mesh_0.discretizations["wing_chord_surface"] = wing_chord_surface
-    vlm_mesh_0.discretizations["h_tail_chord_surface"] = tail_chord_surface
+    vlm_mesh = cd.mesh.VLMMesh()
+    vlm_mesh.discretizations["wing_chord_surface"] = wing_chord_surface
+    vlm_mesh.discretizations["h_tail_chord_surface"] = tail_chord_surface
+    # vlm_mesh.discretizations["v_tail_chord_surface"] = wing_chord_surface
 
-    #Do we need to do any VLM stuff for drag buildup on the fuselage?
+    num_radial = 5 # ? do we even need a propeller discretization
+    cruise_prop_mesh = cd.mesh.RotorMeshes()
+    cruise_prop_discretization = cd.mesh.make_rotor_mesh(
+        cruise_prop, num_radial=num_radial, num_azimuthal=1, num_blades=2
+    )
+    cruise_prop_mesh.discretizations["propeller_discretization"] = cruise_prop_discretization 
 
-    #I think we need to make a mesh for A-Frame? Do that here?
+    # lift rotors
+    lift_rotor_meshes = cd.mesh.RotorMeshes()
+    for i in range(len(lift_rotors)):
+        rotor_discretization = cd.mesh.make_rotor_mesh(
+            lift_rotors[i], num_radial=num_radial, num_azimuthal=1, num_blades=2)
+        lift_rotor_meshes.discretizations[f"rotor_{i}_mesh"] = rotor_discretization
 
     # plot meshes
-    mark2_geom.plot_meshes(meshes=[wing_chord_surface.nodal_coordinates.value, tail_chord_surface.nodal_coordinates.value])
+    # mark2_geom.plot_meshes(meshes=[wing_chord_surface.nodal_coordinates.value, tail_chord_surface.nodal_coordinates.value])
+    
     # Assign mesh to mesh container
-    mesh_container["vlm_mesh_0"] = vlm_mesh_0
+    mesh_container["vlm_mesh"] = vlm_mesh
+    mesh_container["cruise_prop_mesh"] = cruise_prop_mesh
+    mesh_container["lift_rotor_meshes"] = lift_rotor_meshes
 
     # Set up the geometry: this will run the inner optimization
-    base_config.setup_geometry()
+    base_config.setup_geometry(plot=False)
+
+    # tail moment arm
+    wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
+    h_tail_qc = 0.75 * h_tail.LE_center + 0.25 * h_tail.TE_center
+    tail_moment_arm = csdl.norm(wing_qc - h_tail_qc)
+    print("tail moment arm", tail_moment_arm.value)
 
     # Assign base configuration to CADDEE instance
     caddee.base_configuration = base_config
