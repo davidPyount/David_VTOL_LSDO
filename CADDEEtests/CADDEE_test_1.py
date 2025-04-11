@@ -81,7 +81,16 @@ def define_base_config(caddee : cd.CADDEE):
 
     # why isn't the fuselage component assigned to the aircraft?
     fuselage_geometry = aircraft.create_subgeometry(search_names=["Fuselage"])
-    fuselage = cd.aircraft.components.Fuselage(length=fuselage_length, geometry=fuselage_geometry)
+    # fuselage_length.set_as_design_variable(lower=0.8*7.5, upper=1.2*7.5)
+    fuselage_length_var = csdl.Variable(fuselage_length)
+    fuselage = cd.aircraft.components.Fuselage(
+        length=fuselage_length_var, 
+        max_height= 5/12 * ft2m,
+        max_width= 5/12 * ft2m,
+        geometry=fuselage_geometry,
+        skip_ffd = True)
+    
+    # Assign fuselage component to aircraft
     aircraft.comps["fuselage"] = fuselage
 
     # Make wing geometry from aircraft component and instantiate wing component
@@ -118,7 +127,6 @@ def define_base_config(caddee : cd.CADDEE):
     # Connect wing to fuselage at the quarter chord
     base_config.connect_component_geometries(fuselage, wing, 0.75 * wing.LE_center + 0.25 * wing.TE_center)
     # base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center)
-
 
     #Making hstab parameters changeable.
     h_stab_AR = h_stab_span/h_stab_chord #why
@@ -161,14 +169,12 @@ def define_base_config(caddee : cd.CADDEE):
     main_spar = cd.Component(main_spar_geometry,length=main_spar_length)
     aircraft.comps["main_spar"] = main_spar
 
-
     # Connect h-tail to spar?
     base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center) #TE_center doesnt work for some reason
     # Connect v-tail to spar?
     #base_config.connect_component_geometries(main_spar, v_tail, v_tail.TE_center) vtail skips ffd so can we connect???
 
     #Booms
-    #These dont have rotors at the moment. Not sure if we need, not using rotorAD
     #Front Right
     boom_connection_point_initial = 18/12*ft2m
     boom_connection_point = csdl.Variable(name = 'Boom Connection Point',shape = (1,),value = boom_connection_point_initial)
