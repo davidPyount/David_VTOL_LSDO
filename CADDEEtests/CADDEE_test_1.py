@@ -33,36 +33,73 @@ filename = os.path.join(dirname, 'mark2.stp')
 mark2_geom = cd.import_geometry(filename)
 plotting_elements = mark2_geom.plot(show=False, opacity=0.5, color='#FFCD00')
 
+# Start the CSDL recorder
+recorder = csdl.Recorder(inline=True, expand_ops=True)
+recorder.start()
+
 ft2m = 0.3048
 N2lb = 4.44822
-# define INITIAL values for design parameters
-weight = 6 * 4.44822
+g = 9.81
+ftin3_2_kgm3 = 1494.7149
+
+# define initial values for design parameters
+weight = 6 * N2lb
 # fuselage
-fuselage_length = 1.25 * ft2m
+fuse_len = 1.25 * ft2m
+fuse_perim = 1.5 * ft2m
+fuse_t = 3/16/12 * ft2m
 # wing
-wing_span = 4* ft2m
-wing_chord = 9/12 * ft2m
-wing_area = wing_span * wing_chord
-wing_AR = wing_span/wing_chord
+wingspan = 4* ft2m
+wingchord = 9/12 * ft2m
+wing_S = wingspan * wingchord
+wing_AR = wingspan/wingchord
 wing_taper = 1
 # h-stab
 h_stab_span = 1.25 * ft2m
 h_stab_chord = 5/12 * ft2m
 h_stab_AR = h_stab_span/h_stab_chord
-h_stab_area = h_stab_span * h_stab_chord
+h_stab_S = h_stab_span * h_stab_chord
 h_stab_taper = 1
+h_stab_tc = 0.12
 # v-stab
 v_stab_span = 1.08/2 * ft2m
 v_stab_chord = 5/12 * ft2m
 v_stab_AR = v_stab_span/v_stab_chord
-v_stab_area = v_stab_span * v_stab_chord
+v_stab_S = v_stab_span * v_stab_chord
 v_stab_taper = 1
-
+v_stab_tc = 0.12
+# lift rotors
+lift_rotor_d = 14/12 * ft2m
+# cruise propeller
+cruise_prop_d = 8/12 * ft2m
 # main spar
-main_spar_length = 36 * ft2m
-
+main_spar_len = 3 * ft2m
 # wing booms
-wing_boom_length = 36.2 * ft2m
+wing_boom_length = 30/12 * ft2m
+wing_boom_y = 0.457
+# nosecone
+
+# cruise conditions
+alt = 0
+dist = 7000
+pitch = 0
+cruise_v = 70 * ft2m
+sos = 1100 * ft2m
+mach =cruise_v/sos
+
+# weights
+w_total = 6 * cd.Units.mass.pound_to_kg * g
+m_battery = 0.372
+l_battery = 0.155 # [m]
+w_battery = 0.048 # [m]
+h_battery = 0.033 # [m]
+
+# https://www.dupont.com/content/dam/dupont/amer/us/en/performance-building-solutions/public/documents/en/styrofoam-panel-core-20-xps-pis-43-d100943-enus.pdf
+density_foam = 24 # kg/m3
+
+# make instance of CADDEE class
+caddee = cd.CADDEE()
+
 
 do_cruise = True
 do_trim_optimization = True
