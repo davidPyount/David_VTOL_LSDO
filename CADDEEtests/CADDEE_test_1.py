@@ -42,12 +42,10 @@ N2lb = 4.44822
 g = 9.81
 ftin3_2_kgm3 = 1494.7149
 
-# define initial values for design parameters
-weight = 6 * N2lb
+# define INITIAL values for design parameters
+weight = 6 * 4.44822
 # fuselage
-fuse_len = 1.25 * ft2m
-fuse_perim = 1.5 * ft2m
-fuse_t = 3/16/12 * ft2m
+fuselage_length = 1.25 * ft2m
 # wing
 wingspan = 4* ft2m
 wingchord = 9/12 * ft2m
@@ -100,6 +98,11 @@ density_foam = 24 # kg/m3
 # make instance of CADDEE class
 caddee = cd.CADDEE()
 
+# main spar
+main_spar_length = 36 * ft2m
+
+# wing booms
+wing_boom_length = 36.2 * ft2m
 
 do_cruise = True
 do_trim_optimization = True
@@ -121,17 +124,25 @@ def define_base_config(caddee : cd.CADDEE):
     fuselage = cd.aircraft.components.Fuselage(length=fuselage_length, geometry=fuselage_geometry)
     aircraft.comps["fuselage"] = fuselage
     
-    # Treating the boom like a funky fresh fuselage. Its dimensions will change but those of the main fuselage will not
-    main_spar_geometry = aircraft.create_subgeometry(search_names=["MainSpar"])
-    main_spar_length = csdl.Variable(name="fuselage_length", value=main_spar_len)
-    main_spar_length.set_as_design_variable(lower=0.8*main_spar_len, upper=1.2*main_spar_len)
-    main_spar = cd.aircraft.components.Fuselage(
-        length=main_spar_length, 
-        # max_height= 5/12 * ft2m,
-        # max_width= 5/12 * ft2m,
-        geometry=main_spar_geometry,
-        )
+    # # Treating the boom like a funky fresh fuselage. Its dimensions will change but those of the main fuselage will not
+    # main_spar_geometry = aircraft.create_subgeometry(search_names=["MainSpar"])
+    # main_spar_length = csdl.Variable(name="fuselage_length", value=main_spar_len)
+    # main_spar_length.set_as_design_variable(lower=0.8*main_spar_len, upper=1.2*main_spar_len)
+    # main_spar = cd.aircraft.components.Fuselage(
+    #     length=main_spar_length, 
+    #     # max_height= 5/12 * ft2m,
+    #     # max_width= 5/12 * ft2m,
+    #     geometry=main_spar_geometry,
+    #     )
 
+    m_spar_length = csdl.Variable(name="Main Spar Length", value = main_spar_length)
+    m_spar_length.set_as_design_variable(upper= 13.716, lower=9,scaler=1e-1)
+    #Main spar
+    main_spar_geometry = aircraft.create_subgeometry(
+        search_names=["MainSpar"],
+    )
+    main_spar = cd.Component(main_spar_geometry,length=main_spar_length)
+    
     # assign main spar component to aircraft
     aircraft.comps["main_spar"] = main_spar
 
@@ -295,17 +306,12 @@ def define_base_config(caddee : cd.CADDEE):
 
     num_radial = 5 # ? do we even need a propeller discretization
     cruise_prop_mesh = cd.mesh.RotorMeshes()
+    cruise_prop_geom = aircraft.create_subgeometry(search_names=["Main Propeller"])
+    cruise_prop = cd.aircraft.components.Rotor(radius=6, geometry=cruise_prop_geom, compute_surface_area=False, skip_ffd=True)
     cruise_prop_discretization = cd.mesh.make_rotor_mesh(
         cruise_prop, num_radial=num_radial, num_azimuthal=1, num_blades=2
     )
     cruise_prop_mesh.discretizations["propeller_discretization"] = cruise_prop_discretization 
-
-    # lift rotors
-    lift_rotor_meshes = cd.mesh.RotorMeshes()
-    for i in range(len(lift_rotors)):
-        rotor_discretization = cd.mesh.make_rotor_mesh(
-            lift_rotors[i], num_radial=num_radial, num_azimuthal=1, num_blades=2)
-        lift_rotor_meshes.discretizations[f"rotor_{i}_mesh"] = rotor_discretization
 
     # plot meshes
     # mark2_geom.plot_meshes(meshes=[wing_chord_surface.nodal_coordinates.value, tail_chord_surface.nodal_coordinates.value])
@@ -313,7 +319,6 @@ def define_base_config(caddee : cd.CADDEE):
     # Assign mesh to mesh container
     mesh_container["vlm_mesh"] = vlm_mesh
     mesh_container["cruise_prop_mesh"] = cruise_prop_mesh
-    mesh_container["lift_rotor_meshes"] = lift_rotor_meshes
 
     # Set up the geometry: this will run the inner optimization
     base_config.setup_geometry(plot=False)
