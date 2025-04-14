@@ -33,10 +33,6 @@ filename = os.path.join(dirname, 'mark2.stp')
 mark2_geom = cd.import_geometry(filename)
 plotting_elements = mark2_geom.plot(show=False, opacity=0.5, color='#FFCD00')
 
-# Start the CSDL recorder
-recorder = csdl.Recorder(inline=True, expand_ops=True)
-recorder.start()
-
 ft2m = 0.3048
 N2lb = 4.44822
 g = 9.81
@@ -47,10 +43,10 @@ weight = 6 * 4.44822
 # fuselage
 fuselage_length = 1.25 * ft2m
 # wing
-wingspan = 4* ft2m
+span = 4* ft2m
 wingchord = 9/12 * ft2m
-wing_S = wingspan * wingchord
-wing_AR = wingspan/wingchord
+wing_S = span * wingchord
+wing_AR = span/wingchord
 wing_taper = 1
 # h-stab
 h_stab_span = 1.25 * ft2m
@@ -59,6 +55,7 @@ h_stab_AR = h_stab_span/h_stab_chord
 h_stab_S = h_stab_span * h_stab_chord
 h_stab_taper = 1
 h_stab_tc = 0.12
+h_stab_area = h_stab_span * h_stab_chord
 # v-stab
 v_stab_span = 1.08/2 * ft2m
 v_stab_chord = 5/12 * ft2m
@@ -66,6 +63,7 @@ v_stab_AR = v_stab_span/v_stab_chord
 v_stab_S = v_stab_span * v_stab_chord
 v_stab_taper = 1
 v_stab_tc = 0.12
+v_stab_area = v_stab_span * v_stab_chord
 # lift rotors
 lift_rotor_d = 14/12 * ft2m
 # cruise propeller
@@ -122,34 +120,23 @@ def define_base_config(caddee : cd.CADDEE):
     # why isn't the fuselage component assigned to the aircraft?
     fuselage_geometry = aircraft.create_subgeometry(search_names=["Fuselage"])
     fuselage = cd.aircraft.components.Fuselage(length=fuselage_length, geometry=fuselage_geometry)
+    fuselage.quantities.drag_parameters.characteristic_length = fuselage_length #WHY THE HELL IS THIS ALWAYS NONE!!!! #I think CADDEE is supposed to do this by default.
     aircraft.comps["fuselage"] = fuselage
     
-    # # Treating the boom like a funky fresh fuselage. Its dimensions will change but those of the main fuselage will not
-    # main_spar_geometry = aircraft.create_subgeometry(search_names=["MainSpar"])
-    # main_spar_length = csdl.Variable(name="fuselage_length", value=main_spar_len)
-    # main_spar_length.set_as_design_variable(lower=0.8*main_spar_len, upper=1.2*main_spar_len)
-    # main_spar = cd.aircraft.components.Fuselage(
-    #     length=main_spar_length, 
-    #     # max_height= 5/12 * ft2m,
-    #     # max_width= 5/12 * ft2m,
-    #     geometry=main_spar_geometry,
-    #     )
-
-    m_spar_length = csdl.Variable(name="Main Spar Length", value = main_spar_length)
-    m_spar_length.set_as_design_variable(upper= 13.716, lower=9,scaler=1e-1)
-    #Main spar
-    main_spar_geometry = aircraft.create_subgeometry(
-        search_names=["MainSpar"],
-    )
-    main_spar = cd.Component(main_spar_geometry,length=main_spar_length)
-    
+    # Treating the boom like a funky fresh fuselage. Its dimensions will change but those of the main fuselage will not
+    main_spar_geometry = aircraft.create_subgeometry(search_names=["MainSpar"])
+    main_spar = cd.aircraft.components.Fuselage(
+        length=main_spar_len, 
+        geometry=main_spar_geometry,
+        )
+    main_spar.quantities.drag_parameters.characteristic_length = main_spar_len #Refer to above.
     # assign main spar component to aircraft
     aircraft.comps["main_spar"] = main_spar
 
     # Make wing geometry from aircraft component and instantiate wing component
     wing_geometry = aircraft.create_subgeometry(search_names=["Wing"])
     aspect_ratio = csdl.Variable(name="wing_aspect_ratio", value = wing_AR)
-    wing_span = csdl.Variable(name="wing_span", value = wingspan)
+    wing_span = csdl.Variable(name="wing_span", value = span)
     wing_chord = csdl.Variable(name="wing_chord", value=wingchord)
     wing_area = csdl.Variable(name="wing_area", value = wing_S)
     wing_root_twist = csdl.Variable(name="wing_root_twist", value=0)
@@ -158,7 +145,7 @@ def define_base_config(caddee : cd.CADDEE):
     # Set design variables for wing
     # aspect_ratio.set_as_design_variable(upper=1.2 * wing_AR, lower=0.8 * wing_AR, scaler=1/8)
     # wing_area.set_as_design_variable(upper=1.2 * wing_S, lower=0.8 * wing_S, scaler=1/16)
-    wing_span.set_as_design_variable(upper=1.5 * wingspan, lower = 0.8 * wingspan, scaler=1/8)
+    wing_span.set_as_design_variable(upper=1.5 * span, lower = 0.8 * span, scaler=1/8)
     wing_chord.set_as_design_variable(upper = 1.2 * wingchord, lower = 0.8 * wingchord, scaler = 1/16)
     wing_root_twist.set_as_design_variable(upper=np.deg2rad(5), lower=np.deg2rad(-5), scaler=4)
     wing_tip_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=2)
@@ -169,13 +156,13 @@ def define_base_config(caddee : cd.CADDEE):
         tip_twist_delta=wing_tip_twist, geometry=wing_geometry
     )
 
+    wing.quantities.drag_parameters.characteristic_length = wing_chord
     # Assign wing component to aircraft
     aircraft.comps["wing"] = wing
 
     # Connect wing to fuselage at the quarter chord
     base_config.connect_component_geometries(fuselage, wing, 0.75 * wing.LE_center + 0.25 * wing.TE_center)
     # base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center)
-
 
     #Making hstab parameters changeable.
     h_stab_AR = h_stab_span/h_stab_chord #why
@@ -190,19 +177,14 @@ def define_base_config(caddee : cd.CADDEE):
 
     # Make horizontal tail geometry & component
     h_tail_geometry = aircraft.create_subgeometry(search_names=["HStab"])
-    h_tail_AR = csdl.Variable(name="h_tail_AR", value=h_stab_AR)
-    h_tail_area = csdl.Variable(name="h_tail_area", value=h_stab_S)
-    h_tail_span = csdl.Variable(name="wing_span", value = h_stab_span)
-    h_tail_chord = csdl.Variable(name="wing_chord", value=h_stab_chord)
-
-    h_tail_span.set_as_design_variable(lower=0.8 * h_stab_span, upper=1.5 * h_stab_span, scaler=1/4)
-    h_tail_chord.set_as_design_variable(lower=0.8 * h_stab_chord, upper=1.2 * h_stab_chord, scaler=1/4)
-    # h_tail_AR.set_as_design_variable(lower=0.8 * h_stab_AR, upper=1.5 * h_stab_AR, scaler=1/4)
-    # h_tail_area.set_as_design_variable(lower=0.8 * h_stab_S, upper=1.2 * h_stab_S, scaler=1/4)
-    h_tail = cd.aircraft.components.Wing(AR=h_tail_AR, S_ref=h_tail_area, taper_ratio=h_stab_taper, geometry=h_tail_geometry)
+    h_tail = cd.aircraft.components.Wing(
+        AR=h_stab_AR, S_ref=h_stab_area, taper_ratio=h_stab_taper, 
+        geometry=h_tail_geometry, root_twist_delta=h_stab_root_twist, tip_twist_delta=h_stab_tip_twist
+    )
 
     # Assign tail component to aircraft
     aircraft.comps["h_tail"] = h_tail
+    #base_config.connect_component_geometries(fuselage, h_tail, h_tail.TE_center) #.TE_Center doesnt work for some reason
 
     # Make vertical tail geometry & componen
     v_tail_geometry = aircraft.create_subgeometry(search_names=["VStab"])
@@ -221,15 +203,15 @@ def define_base_config(caddee : cd.CADDEE):
     # Assign v-tail component to aircraft
     aircraft.comps["v_tail"] = v_tail
 
-    m_spar_length = csdl.Variable(name="Main Spar Length", value = main_spar_length)
-    m_spar_length.set_as_design_variable(upper= 13.716, lower=9,scaler=1e-1)
-    #Main spar
-    main_spar_geometry = aircraft.create_subgeometry(
-        search_names=["MainSpar"],
-    )
-    main_spar = cd.Component(main_spar_geometry,length=main_spar_length)
-    aircraft.comps["main_spar"] = main_spar
-
+    #Davids version of main spar
+    # m_spar_length = csdl.Variable(name="Main Spar Length", value = main_spar_length)
+    # m_spar_length.set_as_design_variable(upper= 13.716, lower=9,scaler=1e-1)
+    # #Main spar
+    # main_spar_geometry = aircraft.create_subgeometry(
+    #     search_names=["MainSpar"],
+    # )
+    # main_spar = cd.Component(main_spar_geometry,length=main_spar_length)
+    # aircraft.comps["main_spar"] = main_spar
 
     # Connect h-tail to spar?
     base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center) #TE_center doesnt work for some reason
@@ -237,17 +219,16 @@ def define_base_config(caddee : cd.CADDEE):
     #base_config.connect_component_geometries(main_spar, v_tail, v_tail.TE_center) vtail skips ffd so can we connect???
 
     #Booms
-    #These dont have rotors at the moment. Not sure if we need, not using rotorAD
+    #These dont have rotors
     #Front Right
     boom_connection_point_initial = 18/12*ft2m
     boom_connection_point = csdl.Variable(name = 'Boom Connection Point',shape = (1,),value = boom_connection_point_initial)
-    boom_connection_point.set_as_design_variable(upper = wing_span *1.2, lower = 0.5, scaler = 1e-1) #Bounds kind of arbitrary.
+    boom_connection_point.set_as_design_variable(upper = span *1.2, lower = 0.5, scaler = 1e-1) #Bounds kind of arbitrary.
 
     boomFR_geometry = aircraft.create_subgeometry(
         search_names=["FrontRightBoom"]
     )
     boomFR = cd.Component(boomFR_geometry,length=wing_boom_length/2)
-    aircraft.comps["boom_FR"] = boomFR
     base_config.connect_component_geometries(boomFR,wing,connection_point=(wing.LE_center+wing.TE_center)/2+boom_connection_point)
 
     #Back Right
@@ -255,7 +236,6 @@ def define_base_config(caddee : cd.CADDEE):
         search_names=["BackRightBoom"]
     )
     boomBR = cd.Component(boomBR_geometry,length=wing_boom_length/2)
-    aircraft.comps["boom_BR"] = boomBR
     base_config.connect_component_geometries(boomBR,wing,connection_point=(wing.LE_center+wing.TE_center)/2+boom_connection_point)
 
     #Front Left
@@ -263,7 +243,6 @@ def define_base_config(caddee : cd.CADDEE):
         search_names=["FrontLeftBoom"]
     )
     boomFL = cd.Component(boomFL_geometry,length=wing_boom_length/2)
-    aircraft.comps["boom_FL"] = boomFL
     base_config.connect_component_geometries(boomFL,wing,connection_point=(wing.LE_center+wing.TE_center)/2-boom_connection_point)
 
     #Back Left
@@ -271,7 +250,17 @@ def define_base_config(caddee : cd.CADDEE):
         search_names=["BackLeftBoom"]
     )
     boomBL = cd.Component(boomBL_geometry,length=wing_boom_length/2)
+
+    #Testing for drag buildup issues
+    boomFR.quantities.drag_parameters.characteristic_length = 6
+    boomBR.quantities.drag_parameters.characteristic_length = 6
+    boomFL.quantities.drag_parameters.characteristic_length = 6
+    boomBL.quantities.drag_parameters.characteristic_length = 6
+
+    aircraft.comps["boom_BR"] = boomBR
+    aircraft.comps["boom_FL"] = boomFL
     aircraft.comps["boom_BL"] = boomBL
+    aircraft.comps["boom_FR"] = boomFR
     base_config.connect_component_geometries(boomBL,wing,connection_point=(wing.LE_center+wing.TE_center)/2-boom_connection_point)
 
     ## MAKE MESHES
@@ -285,14 +274,6 @@ def define_base_config(caddee : cd.CADDEE):
         num_spanwise=4, # ? decreased for speed, bump this up later
     )
 
-    # V-Tail
-    # ? This code does NOT work for vertical tails
-    # tail_chord_surface = cd.mesh.make_vlm_surface(
-    #     wing_comp=v_tail,
-    #     num_chordwise=1, 
-    #     num_spanwise=10,
-    # )
-
     # Wing chord surface (lifting line)
     wing_chord_surface = cd.mesh.make_vlm_surface(
         wing_comp=wing,
@@ -305,20 +286,22 @@ def define_base_config(caddee : cd.CADDEE):
     # vlm_mesh.discretizations["v_tail_chord_surface"] = wing_chord_surface
 
     num_radial = 5 # ? do we even need a propeller discretization
-    cruise_prop_mesh = cd.mesh.RotorMeshes()
+    #cruise_prop_mesh = cd.mesh.RotorMeshes()
     cruise_prop_geom = aircraft.create_subgeometry(search_names=["Main Propeller"])
     cruise_prop = cd.aircraft.components.Rotor(radius=6, geometry=cruise_prop_geom, compute_surface_area=False, skip_ffd=True)
-    cruise_prop_discretization = cd.mesh.make_rotor_mesh(
+    cruise_prop_mesh = cd.mesh.make_rotor_mesh(
         cruise_prop, num_radial=num_radial, num_azimuthal=1, num_blades=2
     )
-    cruise_prop_mesh.discretizations["propeller_discretization"] = cruise_prop_discretization 
+    rotor_meshes = cd.mesh.RotorMeshes()
+    rotor_meshes.discretizations["cruise_prop_mesh"] = cruise_prop_mesh
+    #cruise_prop_mesh.discretizations["propeller_discretization"] = cruise_prop_discretization 
 
     # plot meshes
     # mark2_geom.plot_meshes(meshes=[wing_chord_surface.nodal_coordinates.value, tail_chord_surface.nodal_coordinates.value])
     
     # Assign mesh to mesh container
     mesh_container["vlm_mesh"] = vlm_mesh
-    mesh_container["cruise_prop_mesh"] = cruise_prop_mesh
+    mesh_container["rotor_meshes"] = rotor_meshes
 
     # Set up the geometry: this will run the inner optimization
     base_config.setup_geometry(plot=False)
@@ -643,18 +626,18 @@ def csdlTrapIntegrator(x,y): #I have no idea if this works correctly
 
 def define_analysis(caddee: cd.CADDEE):
     conditions = caddee.conditions
-    cruise = caddee.conditions["cruise"]
+    cruise = conditions["cruise"]
     cruise_config = cruise.configuration
     mesh_container = cruise_config.mesh_container
     base_config = caddee.base_configuration
     aircraft = base_config.system
 
-    # Cruise stuff
+    # Cruise stuff  
     # Re-evaluate meshes and compute nodal velocities
     cruise.finalize_meshes()
 
     # Make an instance of an airfoil model
-    vlm_mesh_0 = mesh_container["vlm_mesh_0"]
+    vlm_mesh_0 = mesh_container["vlm_mesh"]
     wing_chord_surface = vlm_mesh_0.discretizations["wing_chord_surface"]
     h_tail_chord_surface = vlm_mesh_0.discretizations["h_tail_chord_surface"]
 
@@ -687,29 +670,29 @@ def define_analysis(caddee: cd.CADDEE):
 
     wing = aircraft.comps["wing"]
     fuselage = aircraft.comps["fuselage"]
-    tail = aircraft.comps["tail"]
+    h_tail = aircraft.comps["h_tail"]
     v_tail = aircraft.comps['v_tail']
-    booms = aircraft.comps["booms"]
-    drag_build_up = drag_build_up_model(cruise.quantities.ac_states, cruise.quantities.atmos_states,
-                                        wing.parameters.S_ref, [wing, fuselage, tail, v_tail] + booms)
+    booms = [aircraft.comps["boom_FR"], aircraft.comps["boom_FL"], aircraft.comps["boom_BR"], aircraft.comps["boom_BL"]]
+    # drag_build_up = drag_build_up_model(cruise.quantities.ac_states, cruise.quantities.atmos_states,
+    #                                     wing.parameters.S_ref, [wing, fuselage, h_tail, v_tail] + booms)
     
+    drag_build_up = csdl.Variable(value=np.zeros(3,))
     cruise_power = {}
 
     # BEM solver
-    rotor_meshes = mesh_container["rotor_meshes"] #add these
-    pusher_rotor_mesh = rotor_meshes.discretizations["pusher_prop_mesh"] #add these
-    mesh_vel = pusher_rotor_mesh.nodal_velocities
+    cruise_rotor_mesh = mesh_container["cruise_prop_mesh"]
+    mesh_vel = cruise_rotor_mesh.nodal_velocities
     cruise_rpm = csdl.Variable(name="cruise_pusher_rpm", shape=(1, ), value=1200) #check this
     cruise_rpm.set_as_design_variable(upper=2500, lower=1200, scaler=1e-3) #and this
     bem_inputs = RotorAnalysisInputs()
     bem_inputs.ac_states = cruise.quantities.ac_states
     bem_inputs.atmos_states =  cruise.quantities.atmos_states
-    bem_inputs.mesh_parameters = pusher_rotor_mesh
+    bem_inputs.mesh_parameters = cruise_rotor_mesh
     bem_inputs.mesh_velocity = mesh_vel
     bem_inputs.rpm = cruise_rpm
     bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
     bem_outputs = bem_model.evaluate(bem_inputs)
-    cruise_power["pusher_prop"] = bem_outputs.total_power
+    cruise_power = bem_outputs.total_power
     cruise.quantities.power = cruise_power
 
     # total forces and moments
