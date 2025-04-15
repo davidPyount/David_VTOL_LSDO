@@ -668,7 +668,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
 
     carbon_fiber = af.Material(name='carbon_fiber', E=96.2E9/SF, G = 3.16E9/SF, density = 1420)
     beam_radius = csdl.Variable(value=0.1)
-    beam_radius.set_as_design_variable(lower=0.0015875, scaler=1E3) # needs to be larger than 1/8" for wiring purposes
+    beam_radius.set_as_design_variable(lower=0.0015875, scaler=1e-3) # needs to be larger than 1/8" for wiring purposes
     beam_radius_expanded = csdl.expand(beam_radius, (num_nodes - 1,))
     # beam_1_thickness = csdl.Variable(value=np.ones(num_nodes_1 - 1) * 0.001)
     beam_thickness = csdl.Variable(value=0.0015875) # beam_1_cs = af.CSTube(radius=beam_1_radius, thickness=beam_1_thickness)
@@ -854,7 +854,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     R = csdl.Variable(value=10e3) #m
     cruise_time = R/cruise_veloicty #s
     capacity = cruise.quantities.power * cruise_time #Ws
-    capacity.set_as_constraint(lower=0,upper = 131868, scaler = 1e3)
+    capacity.set_as_constraint(lower=0,upper = 131868, scaler = 1e-3)
     capacity.name = ("Capacity in Ws")
     
     ER = capacity/R
