@@ -207,65 +207,25 @@ def define_base_config(caddee : cd.CADDEE):
     # Assign v-tail component to aircraft
     aircraft.comps["v_tail"] = v_tail
 
-    #Davids version of main spar
-    # m_spar_length = csdl.Variable(name="Main Spar Length", value = main_spar_length)
-    # m_spar_length.set_as_design_variable(upper= 13.716, lower=9,scaler=1e-1)
-    # #Main spar
-    # main_spar_geometry = aircraft.create_subgeometry(
-    #     search_names=["MainSpar"],
-    # )
-    # main_spar = cd.Component(main_spar_geometry,length=main_spar_length)
-    # aircraft.comps["main_spar"] = main_spar
-
     # Connect h-tail to spar?
     base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center) #TE_center doesnt work for some reason
-    # Connect v-tail to spar?
-    #base_config.connect_component_geometries(main_spar, v_tail, v_tail.TE_center) vtail skips ffd so can we connect???
 
     #Booms
-    #These dont have rotors
-    #Front Right
-    boom_connection_point_initial = 18/12*ft2m
-    boom_connection_point = csdl.Variable(name = 'Boom Connection Point',shape = (1,),value = boom_connection_point_initial)
-    boom_connection_point.set_as_design_variable(upper = span *1.2, lower = 0.5, scaler = 1e-1) #Bounds kind of arbitrary.
+    fl_boom_geom = aircraft.create_subgeometry(search_names = ['FrontLeftBoom'])
+    fl_boom = cd.aircraft.components.Fuselage(length=wing_boom_length/2, geometry=fl_boom_geom)
+    aircraft.comps["fl_boom"] = fl_boom
 
-    boomFR_geometry = aircraft.create_subgeometry(
-        search_names=["FrontRightBoom"]
-    )
-    boomFR = cd.Component(boomFR_geometry,length=wing_boom_length/2)
-    base_config.connect_component_geometries(boomFR,wing,connection_point=(wing.LE_center+wing.TE_center)/2+boom_connection_point)
+    rl_boom_geom = aircraft.create_subgeometry(search_names = ['BackLeftBoom'])
+    rl_boom = cd.aircraft.components.Fuselage(length=wing_boom_length/2, geometry=rl_boom_geom)
+    aircraft.comps["rl_boom"] = rl_boom
 
-    #Back Right
-    boomBR_geometry = aircraft.create_subgeometry(
-        search_names=["BackRightBoom"]
-    )
-    boomBR = cd.Component(boomBR_geometry,length=wing_boom_length/2)
-    base_config.connect_component_geometries(boomBR,wing,connection_point=(wing.LE_center+wing.TE_center)/2+boom_connection_point)
+    fr_boom_geom = aircraft.create_subgeometry(search_names = ['FrontRightBoom'])
+    fr_boom = cd.aircraft.components.Fuselage(length=wing_boom_length/2, geometry=fr_boom_geom)
+    aircraft.comps["fr_boom"] = fr_boom
 
-    #Front Left
-    boomFL_geometry = aircraft.create_subgeometry(
-        search_names=["FrontLeftBoom"]
-    )
-    boomFL = cd.Component(boomFL_geometry,length=wing_boom_length/2)
-    base_config.connect_component_geometries(boomFL,wing,connection_point=(wing.LE_center+wing.TE_center)/2-boom_connection_point)
-
-    #Back Left
-    boomBL_geometry = aircraft.create_subgeometry(
-        search_names=["BackLeftBoom"]
-    )
-    boomBL = cd.Component(boomBL_geometry,length=wing_boom_length/2)
-
-    #Testing for drag buildup issues
-    boomFR.quantities.drag_parameters.characteristic_length = 6
-    boomBR.quantities.drag_parameters.characteristic_length = 6
-    boomFL.quantities.drag_parameters.characteristic_length = 6
-    boomBL.quantities.drag_parameters.characteristic_length = 6
-
-    aircraft.comps["boom_BR"] = boomBR
-    aircraft.comps["boom_FL"] = boomFL
-    aircraft.comps["boom_BL"] = boomBL
-    aircraft.comps["boom_FR"] = boomFR
-    base_config.connect_component_geometries(boomBL,wing,connection_point=(wing.LE_center+wing.TE_center)/2-boom_connection_point)
+    rr_boom_geom = aircraft.create_subgeometry(search_names = ['BackRightBoom'])
+    rr_boom = cd.aircraft.components.Fuselage(length=wing_boom_length/2, geometry=rr_boom_geom)
+    aircraft.comps["rr_boom"] = rr_boom
 
     #Generic caddee componets that are used later in define_mass_properties
     #Battery
@@ -295,7 +255,22 @@ def define_base_config(caddee : cd.CADDEE):
     tail_mount = cd.Component()
     aircraft.comps["tail_mount"] = tail_mount
 
-    ## MAKE MESHES
+
+    # # lift rotors to lift booms
+    # base_config.connect_component_geometries(fr_boom, fr_prop, fr_boom.nose_point)
+    # base_config.connect_component_geometries(fl_boom, fl_prop, fl_boom.nose_point)
+    # base_config.connect_component_geometries(rr_boom, rr_prop, rr_boom.tail_point)
+    # base_config.connect_component_geometries(rl_boom, rl_prop, rl_boom.tail_point)
+    # main spar to fuselage
+    base_config.connect_component_geometries(main_spar, fuselage, main_spar.nose_point)
+    # wing booms to wing
+    base_config.connect_component_geometries(fr_boom, wing, fr_boom.tail_point)
+    base_config.connect_component_geometries(fl_boom, wing, fl_boom.tail_point)
+    base_config.connect_component_geometries(rr_boom, wing, rr_boom.nose_point)
+    base_config.connect_component_geometries(rl_boom, wing, rl_boom.nose_point)
+
+
+    ## MAKE MESHES ###################################################################
     # Meshing
     mesh_container = base_config.mesh_container
 
@@ -329,6 +304,8 @@ def define_base_config(caddee : cd.CADDEE):
     cruise_prop_mesh.chord_profile = csdl.Variable(shape=(num_radial, ), value=np.linspace(0.24, 0.08, num_radial))
     rotor_meshes.discretizations["cruise_prop_mesh"] = cruise_prop_mesh
     #cruise_prop_mesh.discretizations["propeller_discretization"] = cruise_prop_discretization 
+
+    base_config.connect_component_geometries(fuselage, cruise_prop, connection_point=fuselage.nose_point)
 
     # plot meshes
     # mark2_geom.plot_meshes(meshes=[wing_chord_surface.nodal_coordinates.value, tail_chord_surface.nodal_coordinates.value])
@@ -366,6 +343,7 @@ def define_conditions(caddee: cd.CADDEE):
 
 def define_mass_properties(caddee : cd.CADDEE):
     """Define the mass properties of the aircraft."""
+
     base_config = caddee.base_configuration
     aircraft = base_config.system
 
@@ -382,9 +360,11 @@ def define_mass_properties(caddee : cd.CADDEE):
     # position pulled from CAD
     battery_x = 7.32*cd.Units.length.inch_to_m
     battery.quantities.mass_properties.mass = battery_mass
-    battery.quantities.mass_properties.cg_vector = csdl.Variable(name="battery_cg", shape=(3,), value = np.array([battery_x, 0, 0]))
-    # ? this is breaking the jax section because it is not an independent variable
-    battery.quantities.mass_properties.cg_vector[0].set_as_design_variable(lower=5*cd.Units.length.inch_to_m, upper=10*cd.Units.length.inch_to_m, scaler=1)
+    battery_x = csdl.Variable(name="battery_x", value=battery_x)
+    battery_position = csdl.Variable(name="battery_position", value=np.zeros((3)))
+    battery_position = battery_position.set(csdl.slice[0],battery_x)
+    battery.quantities.mass_properties.cg_vector = battery_position # csdl.Variable(name="battery_cg", shape=(3,), value = np.array([battery_x, 0, 0]))
+    battery_x.set_as_design_variable(lower=5*cd.Units.length.inch_to_m, upper=10*cd.Units.length.inch_to_m, scaler=1)
     
     # battery_x.set_as_design_variable(lower=5*cd.Units.length.inch_to_m, upper=10*cd.Units.length.inch_to_m, scaler=1)
 
@@ -392,33 +372,38 @@ def define_mass_properties(caddee : cd.CADDEE):
     wing_center = (wing.LE_center + wing.TE_center) / 2
     wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
 
- # approximate the wing cross-section area as an ellipse, rectangle, and triangle
+    # approximate the wing cross-section area as an ellipse, rectangle, and triangle
 
-    wing_max_t = wing.parameters.MAC*wing.parameters.thickness_to_chord
-    wing_ellipse_a = 0.3*wing.parameters.MAC
+    # these values need to be defined in terms of values passed into the wing component
+    wing_span = csdl.sqrt(wing.parameters.AR * wing.parameters.S_ref)
+    wing_chord = csdl.sqrt(wing.parameters.S_ref / wing.parameters.AR)
+    wing_thickness_to_chord = 0.12 * wing_chord
+
+    wing_max_t = wing_chord*wing_thickness_to_chord
+    wing_ellipse_a = 0.3*wing_chord
     wing_ellipse_b = 1/2 * wing_max_t
     wing_ellipse_area = np.pi * wing_ellipse_a * wing_ellipse_b
 
-    wing_rectangle_area = 0.2*wing.parameters.MAC * wing_max_t
+    wing_rectangle_area = 0.2*wing_chord * wing_max_t
 
-    wing_triangle_area = 1/2 * wing_max_t * 0.5*wing.parameters.MAC
+    wing_triangle_area = 1/2 * wing_max_t * 0.5*wing_chord
 
-    wing_cross_section_area = wing_ellipse_area + wing_triangle_area
+    wing_cross_section_area = wing_ellipse_area + wing_rectangle_area + wing_triangle_area
 
-    wing_volume = wing_cross_section_area * wing.parameters.span
+    wing_volume = wing_cross_section_area * wing_span
 
     wing_mass = wing_volume * density_foam
     wing.quantities.mass_properties.mass = wing_mass + fuel_weight
     wing.quantities.mass_properties.cg_vector = 0.56 * wing.LE_center + 0.44 * wing.TE_center # CG is around 44.4% of chord for 4412
 
-# need to get expression for wing weight as function of cross-sectional airfoil area, foam density, and spar radius
-# so this step is probably after wing spar sizing in Aframe
+    #AFRAME INTEGRATED HERE!!!!!!!!
+    #beam_radius, beam_ID_radius = run_beam(caddee:=caddee, vlm_outputs=vlm_outputs)
+    beam_radius = csdl.Variable(value=0.25)
+    beam_ID_radius = csdl.Variable(value = 0.22)
 
-# A-FRAME GOES HERE or somewhere even earlier to replace what is below here
-    
-    wing_spar_OD = 0.375 * cd.Units.length.inch_to_m
-    wing_spar_ID = 0.25 * cd.Units.length.inch_to_m
-    wing_spar_volume = np.pi * ( (wing_spar_OD/2)**2 - (wing_spar_ID/2)**2 ) * wing.parameters.span
+    # wing_spar_OD = 0.375 * cd.Units.length.inch_to_m
+    # wing_spar_ID = 0.25 * cd.Units.length.inch_to_m
+    wing_spar_volume = np.pi * ( beam_radius**2 - beam_ID_radius**2 ) * wing_span
 
     wing_spar_density = 0.054 * ftin3_2_kgm3
 
@@ -428,7 +413,6 @@ def define_mass_properties(caddee : cd.CADDEE):
     wing_spars.quantities.mass_properties.mass = wing_spars_mass
     # CG pulled from CAD of skeleton assembly (battery not included)
     wing_spars.quantities.mass_properties.cg_vector = wing_qc 
-
 
     # Even though the fuselage geometry includes the nosecone, this mass calculation does not! The nosecone mass is part of the skeleton
     fuselage : cd.aircraft.components.Fuselage = aircraft.comps["fuselage"]
@@ -449,16 +433,20 @@ def define_mass_properties(caddee : cd.CADDEE):
     # I think it also fine to just rely on h_tail.parameters
     # approximate the NACA 0012 as an ellipse and a triangle
 
-    h_tail_max_t = h_tail.parameters.MAC*h_tail.parameters.thickness_to_chord
-    h_tail_ellipse_a = 0.3*h_tail.parameters.MAC
+    h_tail_span = csdl.sqrt(h_tail.parameters.AR * h_tail.parameters.S_ref)
+    h_tail_chord = csdl.sqrt(h_tail.parameters.S_ref / h_tail.parameters.AR)
+    h_tail_thickness_to_chord = 0.12 * h_tail_chord
+
+    h_tail_max_t = h_tail_chord*h_tail_thickness_to_chord
+    h_tail_ellipse_a = 0.3*h_tail_chord
     h_tail_ellipse_b = 1/2 * h_tail_max_t
     h_tail_ellipse_area = np.pi * h_tail_ellipse_a * h_tail_ellipse_b
 
-    h_tail_triangle_area = 1/2 * h_tail_max_t * 0.7*h_tail.parameters.MAC
+    h_tail_triangle_area = 1/2 * h_tail_max_t * 0.7*h_tail_chord
 
     h_tail_cross_section_area = h_tail_ellipse_area + h_tail_triangle_area
 
-    h_tail_volume = h_tail_cross_section_area * h_tail.parameters.span
+    h_tail_volume = h_tail_cross_section_area * h_tail_span
     
     h_tail_mass = density_foam * h_tail_volume
     # h_tail_mass = ga_aviation_weights.evaluate_horizontal_tail_weight(
@@ -469,16 +457,20 @@ def define_mass_properties(caddee : cd.CADDEE):
     
     v_tail : cd.aircraft.components.Wing = aircraft.comps["v_tail"]
 
-    v_tail_max_t = v_tail.parameters.MAC*v_tail.parameters.thickness_to_chord
-    v_tail_ellipse_a = 0.3*v_tail.parameters.MAC
+    v_tail_span = csdl.sqrt(v_tail.parameters.AR * v_tail.parameters.S_ref)
+    v_tail_chord = csdl.sqrt(v_tail.parameters.S_ref / v_tail.parameters.AR)
+    v_tail_thickness_to_chord = 0.12 * v_tail_chord
+
+    v_tail_max_t = v_tail_chord*v_tail_thickness_to_chord
+    v_tail_ellipse_a = 0.3*v_tail_chord
     v_tail_ellipse_b = 1/2 * v_tail_max_t
     v_tail_ellipse_area = np.pi * v_tail_ellipse_a * v_tail_ellipse_b
 
-    v_tail_triangle_area = 1/2 * v_tail_max_t * 0.7*v_tail.parameters.MAC
+    v_tail_triangle_area = 1/2 * v_tail_max_t * 0.7*v_tail_chord
 
     v_tail_cross_section_area = v_tail_ellipse_area + v_tail_triangle_area
 
-    v_tail_volume = v_tail_cross_section_area * v_tail.parameters.span
+    v_tail_volume = v_tail_cross_section_area * v_tail_span
 
     v_tail_mass = v_tail_volume * density_foam
     # v_tail_mass = ga_aviation_weights.evaluate_vertical_tail_weight(
@@ -506,7 +498,7 @@ def define_mass_properties(caddee : cd.CADDEE):
     cruise_motor.quantities.mass_properties.cg_vector = fuselage.nose_point + np.array([-1.299*cd.Units.length.inch_to_m, 0.,0.])
 
     # boom assemblies are centered at CG. Consist of boom, wing mount, motor, and motor mount. Treat as single object on each side
-    fl_boom : cd.aircraft.components.Fuselage = aircraft.comps["fl_boom"]
+    fl_boom = cd.aircraft.components.Fuselage = aircraft.comps["fl_boom"]
     fr_boom = cd.aircraft.components.Fuselage = aircraft.comps["fr_boom"]
     rl_boom = cd.aircraft.components.Fuselage = aircraft.comps["rl_boom"]
     rr_boom = cd.aircraft.components.Fuselage = aircraft.comps["rr_boom"]
@@ -544,7 +536,6 @@ def define_mass_properties(caddee : cd.CADDEE):
     main_spar.quantities.mass_properties.mass = main_spar_mass
     main_spar.quantities.mass_properties.cg_vector = main_spar.nose_point - main_spar.tail_point
 
-    # Going to integrate this later.
     # fl_rotor: cd.aircraft.components.Rotor = aircraft.comps["fl_rotor"]
     # fl_rotor_mass = csdl.Variable(name="fl_rotor_mass", value = 0.06625*cd.Units.mass.pound_to_kg)
     # fl_rotor.quantities.mass_properties.mass = fl_rotor_mass
@@ -568,25 +559,23 @@ def define_mass_properties(caddee : cd.CADDEE):
     # rr_rotor.quantities.mass_properties.mass = rr_rotor_mass
     # rr_rotor.quantities.mass_properties.cg_vector = rr_boom.tail_point
 
-    # wing_fuse_mount = aircraft.comps["wing_fuse_mount"]
-    # wing_fuse_mount_mass = csdl.Variable(name="wing_fuse_mount_mass", value = 0.12*cd.Units.mass.pound_to_kg)
-    # # mass and CG pulled from CAD
-    # wing_fuse_mount.quantities.mass_properties.mass = wing_fuse_mount_mass
-    # wing_fuse_mount.quantities.mass_properties.cg_vector = np.array([10.18, 0, -3.16])*cd.Units.length.inch_to_m
+    wing_fuse_mount = aircraft.comps["wing_fuse_mount"]
+    wing_fuse_mount_mass = csdl.Variable(name="wing_fuse_mount_mass", value = 0.12*cd.Units.mass.pound_to_kg)
+    # mass and CG pulled from CAD
+    wing_fuse_mount.quantities.mass_properties.mass = wing_fuse_mount_mass
+    wing_fuse_mount.quantities.mass_properties.cg_vector = np.array([10.18, 0, -3.16])*cd.Units.length.inch_to_m
 
-    # tail_mount = aircraft.comps["tail_mount"]
-    # tail_mount_mass = csdl.Variable(name = "tail_mount_mass", value = 0.13*cd.Units.mass.pound_to_kg)
-    # tail_mount.quantities.mass_properties.mass = tail_mount_mass
-    # tail_mount.quantities.mass_properties.cg_vector = np.array([37.69, 0, -1.34])*cd.Units.length.inch_to_m
-
+    tail_mount = aircraft.comps["tail_mount"]
+    tail_mount_mass = csdl.Variable(name = "tail_mount_mass", value = 0.13*cd.Units.mass.pound_to_kg)
+    tail_mount.quantities.mass_properties.mass = tail_mount_mass
+    tail_mount.quantities.mass_properties.cg_vector = np.array([37.69, 0, -1.34])*cd.Units.length.inch_to_m
 
     weights_solver = cd.aircraft.models.weights.WeightsSolverModel()
     weights_solver.evaluate(
         design_gross_weight, 
         battery_mass, wing_mass, main_spar_mass, wing_spars_mass, fuselage_mass, 
         h_tail_mass, v_tail_mass, skeleton_mass, left_boom_assembly_mass, right_boom_assembly_mass,
-        cruise_motor_mass)
-    #add back wing_fuse_mount_mass, tail_mount_mass,
+        wing_fuse_mount_mass, tail_mount_mass, cruise_motor_mass)
 
     base_config.assemble_system_mass_properties(update_copies=True)
 
@@ -934,7 +923,6 @@ def define_analysis(caddee: cd.CADDEE):
     #WOULD AFRAME GO HERE???????
 
 
-    
     ###################################### BEM STUFF, not using qst (quasi-steady transition)
     # Drag build-up
     drag_build_up_model = cd.aircraft.models.aero.compute_drag_build_up
@@ -943,7 +931,7 @@ def define_analysis(caddee: cd.CADDEE):
     fuselage = aircraft.comps["fuselage"]
     h_tail = aircraft.comps["h_tail"]
     v_tail = aircraft.comps['v_tail']
-    booms = [aircraft.comps["boom_FR"], aircraft.comps["boom_FL"], aircraft.comps["boom_BR"], aircraft.comps["boom_BL"]]
+    # booms = [aircraft.comps["boom_FR"], aircraft.comps["boom_FL"], aircraft.comps["boom_BR"], aircraft.comps["boom_BL"]]
     #This fails for reasons I couldnt tell you why
     # drag_build_up = drag_build_up_model(cruise.quantities.ac_states, cruise.quantities.atmos_states,
     #                                     wing.parameters.S_ref, [wing, fuselage, h_tail, v_tail] + booms)
@@ -967,7 +955,7 @@ def define_analysis(caddee: cd.CADDEE):
         [vlm_forces, bem_outputs.forces], [vlm_moments, bem_outputs.moments] #removed drag_build_up
     )
 
-    youGotMassPropertiesWorking = False #The EOM wont wowkr until mass properties are configured correctly.
+    youGotMassPropertiesWorking = True #The EOM wont wowrk until mass properties are configured correctly.
     if youGotMassPropertiesWorking:
         # eom
         eom_model = cd.aircraft.models.eom.SixDofEulerFlatEarthModel()
@@ -980,48 +968,24 @@ def define_analysis(caddee: cd.CADDEE):
         accel_norm_cruise = accel_cruise.accel_norm
         accel_norm_cruise.name = "cruise_trim"
 
-        #This is how the trim residual is set I think????
-        accel_norm_cruise.set_as_constraint(upper=0, lower=0, scaler=4)
-        
-        # #OLD BAD TRIM RESIDUAL
-        # #mark2_weight = aircraft.quantities.mass_properties.mass
-        # mark2_weight = csdl.Variable(value=6,name="Gross Weight",shape = (1,))
-
-        # #This is like a very basic trim residual, do a better one!!!!
-        # lift_constraint = total_lift - mark2_weight
-        # lift_constraint.name = "lift_equals_weight_constraint"
-        # lift_constraint.set_as_constraint(equals=0., scaler=1e-3)
-
-        # # set objectives and constraints
-        # total_induced_drag.name = "total_induced_drag"
-        # #thrust = -total_induced_drag
-        
-        # total_induced_drag.set_as_objective(scaler=1e-2)
+        #This is how the trim residual is set.
+        accel_norm_cruise.set_as_constraint(upper=0, lower=0, scaler=1)
 
     ########### Mission Power Analysis
     cruise_veloicty = cruise.parameters.speed
     R = csdl.Variable(value=10e3) #m
     cruise_time = R/cruise_veloicty #s
 
-    cruise_pusher_rotor_power = csdl.Variable(name="cruise_pusher_power",shape=(1,), value = 223) #W
-    cruise_pusher_rotor_power.set_as_constraint(upper=355, lower=0, scaler=1e-3) #is this a good scaler?
-    #Should this be a constraint or a design variable?
-
-    total_power = cruise_pusher_rotor_power / 0.95 #effciency factor?
-    mission_time = cruise_time
-    mission_energy = total_power*mission_time #W-seconds
     #mission_energy.set_as_design_variable(upper = 2300,lower = 0, scaler = 1e-3)
-    ER = mission_energy/R #Is this properly a csdl variable? I feel like I did this wrong lmaooo
-
+    ER = cruise.quantities.power/R #Is this properly a csdl variable? I feel like I did this wrong lmaooo
+    ER.name = "E/R"
     aircraft = caddee.base_configuration.system
     wing = aircraft.comps["wing"]
 
     #weight = wing_weight_model(wing.parameters.AR,wing.parameters.S_ref,csdl.Variable(value=4),csdl.Variable(value=4),csdl.Variable(value=12),csdl.Variable(value=0.2))
     #print(f"The calculated wing weight is {weight}")
 
-    ## We have constant mission range. Shoulnd't vortexAD inform power required for cruise at specified velocity?
-
-    #SET AS OBJECTIVVEEEEE
+    #SET AS OBJECTIVE
     ER.set_as_objective()
 
 if __name__ == "__main__": #I like doing this because it makes it clear where the main executiom begins and also I can collapse it : )
@@ -1037,7 +1001,7 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
     define_conditions(caddee=caddee)
 
     #Define masses and set up mass models (how do masses change with change in parameters)
-    #define_mass_properties(caddee=caddee)
+    define_mass_properties(caddee=caddee)
 
     #What analysis are we performing, this calls the other define configuration functions
     define_analysis(caddee=caddee)
