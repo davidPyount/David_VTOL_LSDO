@@ -42,6 +42,10 @@ ftin3_2_kgm3 = 1494.7149
 weight = 6 * 4.44822
 # fuselage
 fuselage_length = 1.25 * ft2m
+# fuselage seth version
+fuse_len = 1.25 * ft2m
+fuse_perim = 1.5 * ft2m
+fuse_t = 3/16/12 * ft2m
 # wing
 span = 4* ft2m
 wingchord = 9/12 * ft2m
@@ -263,6 +267,34 @@ def define_base_config(caddee : cd.CADDEE):
     aircraft.comps["boom_FR"] = boomFR
     base_config.connect_component_geometries(boomBL,wing,connection_point=(wing.LE_center+wing.TE_center)/2-boom_connection_point)
 
+    #Generic caddee componets that are used later in define_mass_properties
+    #Battery
+    battery = cd.Component()
+    aircraft.comps["battery"] = battery
+
+    #Wing spars?
+    wing_spars = cd.Component()
+    aircraft.comps["wing_spars"] = wing_spars
+
+    #Skeleton
+    skeleton = cd.Component()
+    aircraft.comps["skeleton"] = skeleton
+
+    left_boom_assembly = cd.Component()
+    aircraft.comps["left_boom_assembly"] = left_boom_assembly
+
+    right_boom_assembly = cd.Component()
+    aircraft.comps["right_boom_assembly"] = right_boom_assembly
+
+    cruise_motor = cd.Component()
+    aircraft.comps["cruise_motor"] = cruise_motor
+
+    wing_fuse_mount = cd.Component()
+    aircraft.comps["wing_fuse_mount"] = wing_fuse_mount
+
+    tail_mount = cd.Component()
+    aircraft.comps["tail_mount"] = tail_mount
+
     ## MAKE MESHES
     # Meshing
     mesh_container = base_config.mesh_container
@@ -355,11 +387,6 @@ def define_mass_properties(caddee : cd.CADDEE):
     battery.quantities.mass_properties.cg_vector[0].set_as_design_variable(lower=5*cd.Units.length.inch_to_m, upper=10*cd.Units.length.inch_to_m, scaler=1)
     
     # battery_x.set_as_design_variable(lower=5*cd.Units.length.inch_to_m, upper=10*cd.Units.length.inch_to_m, scaler=1)
-
-    # ga_aviation_weights = cd.aircraft.models.weights.general_aviation_weights.GeneralAviationWeights(
-    #     design_gross_weight=design_gross_weight,
-    #     dynamic_pressure=dynamic_pressure,
-    # )
 
     wing : cd.aircraft.components.Wing = aircraft.comps["wing"]
     wing_center = (wing.LE_center + wing.TE_center) / 2
@@ -517,54 +544,40 @@ def define_mass_properties(caddee : cd.CADDEE):
     main_spar.quantities.mass_properties.mass = main_spar_mass
     main_spar.quantities.mass_properties.cg_vector = main_spar.nose_point - main_spar.tail_point
 
-    fl_rotor: cd.aircraft.components.Rotor = aircraft.comps["fl_rotor"]
-    fl_rotor_mass = csdl.Variable(name="fl_rotor_mass", value = 0.06625*cd.Units.mass.pound_to_kg)
-    fl_rotor.quantities.mass_properties.mass = fl_rotor_mass
-    fl_rotor.quantities.mass_properties.cg_vector = fl_boom.nose_point
+    # Going to integrate this later.
+    # fl_rotor: cd.aircraft.components.Rotor = aircraft.comps["fl_rotor"]
+    # fl_rotor_mass = csdl.Variable(name="fl_rotor_mass", value = 0.06625*cd.Units.mass.pound_to_kg)
+    # fl_rotor.quantities.mass_properties.mass = fl_rotor_mass
+    # fl_rotor.quantities.mass_properties.cg_vector = fl_boom.nose_point
     
-    rl_rotor : cd.aircraft.components.Rotor = aircraft.comps["rl_rotor"]
-    rl_rotor = aircraft.comps["rl_rotor"]
-    rl_rotor_mass = fl_rotor_mass
-    rl_rotor.quantities.mass_properties.mass = fl_rotor_mass
-    rl_rotor.quantities.mass_properties.cg_vector = rl_boom.tail_point
+    # rl_rotor : cd.aircraft.components.Rotor = aircraft.comps["rl_rotor"]
+    # rl_rotor = aircraft.comps["rl_rotor"]
+    # rl_rotor_mass = fl_rotor_mass
+    # rl_rotor.quantities.mass_properties.mass = fl_rotor_mass
+    # rl_rotor.quantities.mass_properties.cg_vector = rl_boom.tail_point
 
-    fr_boom : cd.aircraft.components.Fuselage = aircraft.comps["fr_boom"]
-    fr_rotor = aircraft.comps["fr_rotor"]
-    fr_rotor_mass = fl_rotor_mass
-    fr_rotor.quantities.mass_properties.mass = fr_rotor_mass
-    fr_rotor.quantities.mass_properties.cg_vector = fr_boom.nose_point
+    # fr_boom : cd.aircraft.components.Fuselage = aircraft.comps["fr_boom"]
+    # fr_rotor = aircraft.comps["fr_rotor"]
+    # fr_rotor_mass = fl_rotor_mass
+    # fr_rotor.quantities.mass_properties.mass = fr_rotor_mass
+    # fr_rotor.quantities.mass_properties.cg_vector = fr_boom.nose_point
 
-    rr_boom : cd.aircraft.components.Fuselage = aircraft.comps["rr_boom"]
-    rr_rotor = aircraft.comps["rr_rotor"]
-    rr_rotor_mass = fl_rotor_mass
-    rr_rotor.quantities.mass_properties.mass = rr_rotor_mass
-    rr_rotor.quantities.mass_properties.cg_vector = rr_boom.tail_point
+    # rr_boom : cd.aircraft.components.Fuselage = aircraft.comps["rr_boom"]
+    # rr_rotor = aircraft.comps["rr_rotor"]
+    # rr_rotor_mass = fl_rotor_mass
+    # rr_rotor.quantities.mass_properties.mass = rr_rotor_mass
+    # rr_rotor.quantities.mass_properties.cg_vector = rr_boom.tail_point
 
-    wing_fuse_mount = aircraft.comps["wing_fuse_mount"]
-    wing_fuse_mount_mass = csdl.Variable(name="wing_fuse_mount_mass", value = 0.12*cd.Units.mass.pound_to_kg)
-    # mass and CG pulled from CAD
-    wing_fuse_mount.quantities.mass_properties.mass = wing_fuse_mount_mass
-    wing_fuse_mount.quantities.mass_properties.cg_vector = np.array([10.18, 0, -3.16])*cd.Units.length.inch_to_m
+    # wing_fuse_mount = aircraft.comps["wing_fuse_mount"]
+    # wing_fuse_mount_mass = csdl.Variable(name="wing_fuse_mount_mass", value = 0.12*cd.Units.mass.pound_to_kg)
+    # # mass and CG pulled from CAD
+    # wing_fuse_mount.quantities.mass_properties.mass = wing_fuse_mount_mass
+    # wing_fuse_mount.quantities.mass_properties.cg_vector = np.array([10.18, 0, -3.16])*cd.Units.length.inch_to_m
 
-# rolled these into boom assembly
-
-    # left_wing_boom_mount = aircraft.comps(["left_wing_boom_mount"])
-    # left_wing_boom_mount_mass = csdl.Variable(name = "left_wing_boom_mount_mass", value = 0.12/32.174*cd.Units.mass.pound_to_kg)
-    #   # mass and CG pulled from CAD
-    # left_wing_boom_mount.quantities.mass_properties.mass = left_wing_boom_mount_mass
-    # left_wing_boom_mount.quantities.mass_properties.cg_vector = np.array([10.37 -18 3])*cd.Units.length.inch_to_m
-
-    # right_wing_boom_mount = aircraft.comps(["right_wing_boom_mount"])
-    # right_wing_boom_mount_mass = left_wing_boom_mount_mass
-    #   # mass and CG pulled from CAD
-    # right_wing_boom_mount.quantities.mass_properties.mass = right_wing_boom_mount_mass
-    # right_wing_boom_mount.quantities.mass_properties.cg_vector = np.array([10.37 18 3])*cd.Units.length.inch_to_m
-
-
-    tail_mount = aircraft.comps["tail_mount"]
-    tail_mount_mass = csdl.Variable(name = "tail_mount_mass", value = 0.13*cd.Units.mass.pound_to_kg)
-    tail_mount.quantities.mass_properties.mass = tail_mount_mass
-    tail_mount.quantities.mass_properties.cg_vector = np.array([37.69, 0, -1.34])*cd.Units.length.inch_to_m
+    # tail_mount = aircraft.comps["tail_mount"]
+    # tail_mount_mass = csdl.Variable(name = "tail_mount_mass", value = 0.13*cd.Units.mass.pound_to_kg)
+    # tail_mount.quantities.mass_properties.mass = tail_mount_mass
+    # tail_mount.quantities.mass_properties.cg_vector = np.array([37.69, 0, -1.34])*cd.Units.length.inch_to_m
 
 
     weights_solver = cd.aircraft.models.weights.WeightsSolverModel()
@@ -572,8 +585,8 @@ def define_mass_properties(caddee : cd.CADDEE):
         design_gross_weight, 
         battery_mass, wing_mass, main_spar_mass, wing_spars_mass, fuselage_mass, 
         h_tail_mass, v_tail_mass, skeleton_mass, left_boom_assembly_mass, right_boom_assembly_mass,
-        wing_fuse_mount_mass, tail_mount_mass, cruise_motor_mass)
-
+        cruise_motor_mass)
+    #add back wing_fuse_mount_mass, tail_mount_mass,
 
     base_config.assemble_system_mass_properties(update_copies=True)
 
