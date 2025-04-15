@@ -1,4 +1,3 @@
-'''Induced drag minimization example'''
 import CADDEE_alpha as cd
 import csdl_alpha as csdl
 import numpy as np
@@ -20,8 +19,6 @@ units = Units()
 
 #TO DO
 #Updated weights model -> create static stability criteria (both vtol and FW) -> informs spar length (tail arm), boom placement
-#Determine why objective function isnt really working : (
-#Get structural sizing working
 
 # Start the CSDL recorder
 recorder = csdl.Recorder(inline=True, expand_ops=True)
@@ -75,9 +72,8 @@ cruise_prop_d = 8/12 * ft2m
 # main spar
 main_spar_len = 3 * ft2m
 # wing booms
-wing_boom_length = 30/12 * ft2m
+wing_boom_len = 30/12 * ft2m
 wing_boom_y = 0.457
-# nosecone
 
 # cruise conditions
 alt = 0
@@ -99,18 +95,6 @@ density_foam = 24 # kg/m3
 
 # make instance of CADDEE class
 caddee = cd.CADDEE()
-
-# main spar
-main_spar_length = 36 * ft2m
-
-# wing booms
-wing_boom_length = 36.2 * ft2m
-
-do_cruise = True
-do_trim_optimization = True
-do_structural_sizing = False
-run_optimization = True
-run_ffd = True
 
 def define_base_config(caddee : cd.CADDEE):
     """Build the system configuration and define meshes."""
@@ -208,9 +192,12 @@ def define_base_config(caddee : cd.CADDEE):
     aircraft.comps["v_tail"] = v_tail
 
     # Connect h-tail to spar?
-    base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center) #TE_center doesnt work for some reason
+    base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center)
 
     #Booms
+    wing_boom_length = csdl.Variable(value=wing_boom_len,name='Wing Boom Length')
+    wing_boom_length.set_as_constraint(upper = 50/12*ft2m, lower = 1*ft2m, scaler=1e-1) #these limits are currently arbitrary.
+
     fl_boom_geom = aircraft.create_subgeometry(search_names = ['FrontLeftBoom'])
     fl_boom = cd.aircraft.components.Fuselage(length=wing_boom_length/2, geometry=fl_boom_geom)
     aircraft.comps["fl_boom"] = fl_boom
@@ -255,7 +242,6 @@ def define_base_config(caddee : cd.CADDEE):
     tail_mount = cd.Component()
     aircraft.comps["tail_mount"] = tail_mount
 
-
     # # lift rotors to lift booms
     # base_config.connect_component_geometries(fr_boom, fr_prop, fr_boom.nose_point)
     # base_config.connect_component_geometries(fl_boom, fl_prop, fl_boom.nose_point)
@@ -292,19 +278,18 @@ def define_base_config(caddee : cd.CADDEE):
     vlm_mesh.discretizations["h_tail_chord_surface"] = tail_chord_surface
     # vlm_mesh.discretizations["v_tail_chord_surface"] = wing_chord_surface
 
-    num_radial = 5 # ? do we even need a propeller discretization
-    #cruise_prop_mesh = cd.mesh.RotorMeshes()
-    cruise_prop_geom = aircraft.create_subgeometry(search_names=["Main Propeller"])
-    cruise_prop = cd.aircraft.components.Rotor(radius=6, geometry=cruise_prop_geom, compute_surface_area=False, skip_ffd=True)
-    cruise_prop_mesh = cd.mesh.make_rotor_mesh(
+    num_radial = 5
+    cruise_prop_geom = aircraft.create_subgeometry(search_names=["Main Propeller"]) #get geo from openvsp
+    cruise_prop = cd.aircraft.components.Rotor(radius=6, geometry=cruise_prop_geom, compute_surface_area=False, skip_ffd=True) #make CADDEE component
+    cruise_prop_mesh = cd.mesh.make_rotor_mesh( #made bladeAD rotor mesh (not CADDEE mesh)
         cruise_prop, num_radial=num_radial, num_azimuthal=1, num_blades=2
     )
-    rotor_meshes = cd.mesh.RotorMeshes()
+    rotor_meshes = cd.mesh.RotorMeshes() #make caddee-compatible mesh holder
     cruise_prop_mesh.twist_profile = csdl.Variable(shape=(num_radial, ), value=np.deg2rad(np.linspace(50., 20., num_radial))) #These are taken from other code, make them accurate for us.
     cruise_prop_mesh.chord_profile = csdl.Variable(shape=(num_radial, ), value=np.linspace(0.24, 0.08, num_radial))
-    rotor_meshes.discretizations["cruise_prop_mesh"] = cruise_prop_mesh
-    #cruise_prop_mesh.discretizations["propeller_discretization"] = cruise_prop_discretization 
+    rotor_meshes.discretizations["cruise_prop_mesh"] = cruise_prop_mesh #Assign bladeAD rotor mesh to caddee rotor mesh container
 
+    #Connect cruise prop
     base_config.connect_component_geometries(fuselage, cruise_prop, connection_point=fuselage.nose_point)
 
     # plot meshes
@@ -349,7 +334,7 @@ def define_mass_properties(caddee : cd.CADDEE):
 
     conditions = caddee.conditions
     cruise : cd.aircraft.conditions.CruiseCondition = conditions["cruise"]
-    dynamic_pressure = 0.5 * cruise.quantities.atmos_states.density * cruise.parameters.speed**2
+    #dynamic_pressure = 0.5 * cruise.quantities.atmos_states.density * cruise.parameters.speed**2
 
     design_gross_weight = csdl.Variable(name="design_gross_weight", value=w_total)
     # fuel_weight = csdl.Variable(name="fuel_weight", value=250*cd.Units.mass.pound_to_kg)
@@ -365,8 +350,6 @@ def define_mass_properties(caddee : cd.CADDEE):
     battery_position = battery_position.set(csdl.slice[0],battery_x)
     battery.quantities.mass_properties.cg_vector = battery_position # csdl.Variable(name="battery_cg", shape=(3,), value = np.array([battery_x, 0, 0]))
     battery_x.set_as_design_variable(lower=5*cd.Units.length.inch_to_m, upper=10*cd.Units.length.inch_to_m, scaler=1)
-    
-    # battery_x.set_as_design_variable(lower=5*cd.Units.length.inch_to_m, upper=10*cd.Units.length.inch_to_m, scaler=1)
 
     wing : cd.aircraft.components.Wing = aircraft.comps["wing"]
     wing_center = (wing.LE_center + wing.TE_center) / 2
@@ -397,7 +380,13 @@ def define_mass_properties(caddee : cd.CADDEE):
     wing.quantities.mass_properties.cg_vector = 0.56 * wing.LE_center + 0.44 * wing.TE_center # CG is around 44.4% of chord for 4412
 
     #AFRAME INTEGRATED HERE!!!!!!!!
-    #beam_radius, beam_ID_radius = run_beam(caddee:=caddee, vlm_outputs=vlm_outputs)
+    
+    #might need to save VLM outputs globally
+
+    #beam_radius, beam_ID_radius = run_beam(caddee=caddee, vlm_outputs=vlm_outputs)
+
+
+
     beam_radius = csdl.Variable(value=0.25)
     beam_ID_radius = csdl.Variable(value = 0.22)
 
@@ -910,13 +899,12 @@ def define_analysis(caddee: cd.CADDEE):
         airfoil_alpha_stall_models=[None, None],
     )
 
-
     vlm_forces = vlm_outputs_1.total_force
     vlm_moments = vlm_outputs_1.total_moment
 
-    # We multiply by (-1) since the lift and drag are w.r.t. the flight-dynamics reference frame
-    total_induced_drag = vlm_outputs_1.total_drag * -1
-    total_lift = vlm_outputs_1.total_lift * -1
+    # # We multiply by (-1) since the lift and drag are w.r.t. the flight-dynamics reference frame
+    # total_induced_drag = vlm_outputs_1.total_drag * -1
+    # total_lift = vlm_outputs_1.total_lift * -1
 
     #Do strucutal sizing and weights model? Update structure and weights?
 
@@ -975,13 +963,15 @@ def define_analysis(caddee: cd.CADDEE):
     cruise_veloicty = cruise.parameters.speed
     R = csdl.Variable(value=10e3) #m
     cruise_time = R/cruise_veloicty #s
-
-    #mission_energy.set_as_design_variable(upper = 2300,lower = 0, scaler = 1e-3)
-    ER = cruise.quantities.power/R #Is this properly a csdl variable? I feel like I did this wrong lmaooo
+    capacity = cruise.quantities.power * cruise_time #Ws
+    capacity.set_as_constraint(lower=0,upper = 131868, scaler = 1e3)
+    
+    ER = capacity/R
     ER.name = "E/R"
-    aircraft = caddee.base_configuration.system
-    wing = aircraft.comps["wing"]
 
+    #Davids wing weight model testing stuff
+    # aircraft = caddee.base_configuration.system
+    # wing = aircraft.comps["wing"]
     #weight = wing_weight_model(wing.parameters.AR,wing.parameters.S_ref,csdl.Variable(value=4),csdl.Variable(value=4),csdl.Variable(value=12),csdl.Variable(value=0.2))
     #print(f"The calculated wing weight is {weight}")
 
