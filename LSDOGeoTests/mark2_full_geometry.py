@@ -16,11 +16,11 @@ recorder = csdl.Recorder(inline=True)
 recorder.start()
 
 # you might need to change this
-import_file_path = 'LSDOGeoTests/'
+# import_file_path = 'LSDOGeoTests/'
 import_file = 'mark2.stp'
-geometry = lg.import_geometry(import_file_path + import_file, parallelize=False)
+geometry = lg.import_geometry('mark2.stp', parallelize=False)
 
-plotting = False
+plotting = True
 
 # geometry.plot()
 

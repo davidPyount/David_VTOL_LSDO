@@ -55,13 +55,14 @@ quarter_chord_center = geometry.project(np.array([0.25, 0.0, 0.0]))
 # endregion
 
 # region Mesh definitions
-# region Wing Camber Surface
+# region Wing Camber Surfac
+# nodes
 num_spanwise = 11
 num_chordwise = 4
 points_to_project_on_leading_edge = np.linspace(np.array([0., -4., 1.]), np.array([0., 4., 1.]), num_spanwise)
 points_to_project_on_trailing_edge = np.linspace(np.array([1., -4., 1.]), np.array([1., 4., 1.]), num_spanwise)
 
-leading_edge_parametric = geometry.project(points_to_project_on_leading_edge, direction=np.array([0., 0., -1.]), plot=False)
+leading_edge_parametric = geometry.project(points_to_project_on_leading_edge, direction=np.array([0., 0., -1.]), plot=True)
 leading_edge_physical = geometry.evaluate(leading_edge_parametric, plot=False)
 trailing_edge_parametric = geometry.project(points_to_project_on_trailing_edge, direction=np.array([0., 0., -1.]), plot=False)
 trailing_edge_physical = geometry.evaluate(trailing_edge_parametric)

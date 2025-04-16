@@ -1,0 +1,28 @@
+
+	Solution from Scipy SLSQP:
+	----------------------------------------------------------------------------------------------------
+	Problem                  : induced_drag_minimization
+	Solver                   : scipy-slsqp
+	Success                  : False
+	Message                  : Positive directional derivative for linesearch
+	Status                   : 8
+	Total time               : 37.24350905418396
+	Objective                : -0.05793800465356552
+	Gradient norm            : 0.6904415635862834
+	Total function evals     : 21
+	Total gradient evals     : 16
+	Major iterations         : 20
+	Total callbacks          : 75
+	Reused callbacks         : 0
+	obj callbacks            : 21
+	grad callbacks           : 16
+	hess callbacks           : 0
+	con callbacks            : 22
+	jac callbacks            : 16
+	Optimal variables        : [ 9.14400000e-01  5.63916868e-01  2.09031840e-02 -3.49065850e-01
+  3.49065850e-01  3.75000000e-01  1.81451250e-02  0.00000000e+00
+  1.27000000e-01  8.64817693e+01]
+	Optimal obj. gradient    : [-8.34206691e-08 -2.68472696e-02 -6.86140555e-01  6.85569030e-03
+ -1.44385998e-02  3.09676907e-03 -7.02469021e-02 -0.00000000e+00
+ -3.47913962e-05 -4.72191921e-04]
+	----------------------------------------------------------------------------------------------------
