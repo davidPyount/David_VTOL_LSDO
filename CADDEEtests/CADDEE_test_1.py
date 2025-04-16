@@ -802,7 +802,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
 
     ###################################### BEM STUFF, not using qst (quasi-steady transition)
     # Drag build-up
-    drag_build_up_model = cd.aircraft.models.aero.compute_drag_build_up
+    #drag_build_up_model = cd.aircraft.models.aero.compute_drag_build_up
 
     wing = aircraft.comps["wing"]
     fuselage = aircraft.comps["fuselage"]
@@ -812,7 +812,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
 
     #This fails for reasons I couldnt tell you why
     # drag_build_up = drag_build_up_model(cruise.quantities.ac_states, cruise.quantities.atmos_states,
-    #                                     wing.parameters.S_ref, [wing, fuselage, h_tail, v_tail] + booms)
+    #                                     wing.parameters.S_ref, [wing, fuselage, h_tail, v_tail])
     
     cruise_power = {}
 
@@ -834,7 +834,6 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
         [vlm_forces, bem_outputs.forces], [vlm_moments, bem_outputs.moments] #removed drag_build_up
     )
 
-
     # eom
     eom_model = cd.aircraft.models.eom.SixDofEulerFlatEarthModel()
     accel_cruise = eom_model.evaluate(
@@ -847,7 +846,22 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     accel_norm_cruise.name = "cruise_trim"
 
     #This is how the trim residual is set.
-    #accel_norm_cruise.set_as_constraint(upper=0.1, lower=-0.1, scaler=1e1)
+    accel_norm_cruise.set_as_constraint(upper=0.1, lower=-0.1, scaler=1e1)
+
+    # Performing linearized stability analysis
+    long_stability_results = cruise.perform_linear_stability_analysis(
+        total_forces=total_forces_cruise,
+        total_moments=total_moments_cruise,
+        ac_states=cruise.quantities.ac_states,
+        mass_properties=cruise_config.system.quantities.mass_properties,
+    )
+
+    # t2d = long_stability_results.time_2_double_phugoid
+    # t2d.name = "time2double"
+    # drph = long_stability_results.damping_ratio_phugoid
+    # drph.set_as_constraint(upper=0.045,lower=0.04,scaler=1/0.04)
+    # drsp = long_stability_results.damping_ratio_short_period
+    # drsp.set_as_constraint(lower=0.7,upper=2,scaler=1/0.7)
 
     ########### Mission Power Analysis
     cruise_veloicty = cruise.parameters.speed
