@@ -306,8 +306,8 @@ def define_base_config(caddee : cd.CADDEE):
     wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
     h_tail_qc = 0.75 * h_tail.LE_center + 0.25 * h_tail.TE_center
     tail_moment_arm = csdl.norm(wing_qc - h_tail_qc)
-    print("tail moment arm", tail_moment_arm.value)
-
+    print("tail moment arm", tail_moment_arm)
+          
     # Assign base configuration to CADDEE instance
     caddee.base_configuration = base_config
 
@@ -490,7 +490,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     half_boom_OD = 0.75 * cd.Units.length.inch_to_m
     half_boom_ID = 0.625 * cd.Units.length.inch_to_m # double check this
     half_boom_length = csdl.norm(fl_boom.nose_point - fl_boom.tail_point)
-    half_boom_volume = np.pi*((half_boom_OD/2)**2 - (half_boom_ID/2)**2) * half_boom_length.value 
+    half_boom_volume = np.pi*((half_boom_OD/2)**2 - (half_boom_ID/2)**2) * half_boom_length
     half_boom_density = 0.054 * ftin3_2_kgm3 # ?? get from AFL
     half_boom_mass = half_boom_volume * half_boom_density
 
@@ -498,14 +498,14 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     lift_motor_mass = 117/1000 # kg
     lift_motor_mount_mass = 0.06*cd.Units.mass.pound_to_kg
     left_wing_boom_mount_mass = 0.12*cd.Units.mass.pound_to_kg
-    left_boom_assembly_mass = csdl.Variable(name="left_boom_assembly_mass", value = left_wing_boom_mount_mass + (half_boom_mass + lift_motor_mass + lift_motor_mount_mass)*2)
+    left_boom_assembly_mass = left_wing_boom_mount_mass + (half_boom_mass + lift_motor_mass + lift_motor_mount_mass)*2
     left_boom_assembly.quantities.mass_properties.mass = left_boom_assembly_mass
     left_boom_assembly.quantities.mass_properties.cg_vector = wing_qc + np.array([0, -18, 0])*cd.Units.length.inch_to_m
 
     right_boom_assembly = aircraft.comps["right_boom_assembly"]
     lift_motor_mass = 117/1000 # kg
     right_wing_boom_mount_mass = 0.12*cd.Units.mass.pound_to_kg
-    right_boom_assembly_mass = csdl.Variable(name="right_boom_assembly_mass", value = right_wing_boom_mount_mass + (half_boom_mass + lift_motor_mass + lift_motor_mount_mass)*2)
+    right_boom_assembly_mass = right_wing_boom_mount_mass + (half_boom_mass + lift_motor_mass + lift_motor_mount_mass)*2
     right_boom_assembly.quantities.mass_properties.mass = right_boom_assembly_mass
     right_boom_assembly.quantities.mass_properties.cg_vector = wing_qc + np.array([0, 18, 0])*cd.Units.length.inch_to_m
 
@@ -514,9 +514,9 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     main_spar_density = half_boom_density
     main_spar : cd.aircraft.components.Fuselage = aircraft.comps["main_spar"]
     main_spar_length = csdl.norm(main_spar.nose_point - main_spar.tail_point)
-    main_spar_volume = np.pi*((main_spar_OD/2)**2 - (main_spar_ID/2)**2) * main_spar_length.value
+    main_spar_volume = np.pi*((main_spar_OD/2)**2 - (main_spar_ID/2)**2) * main_spar_length
     main_spar_mass = main_spar_density * main_spar_volume
-    main_spar_mass = csdl.Variable(name="main_spar_mass", value = main_spar_mass)
+    #main_spar_mass = csdl.Variable(name="main_spar_mass", value = main_spar_mass)
     main_spar.quantities.mass_properties.mass = main_spar_mass
     main_spar.quantities.mass_properties.cg_vector = main_spar.nose_point - main_spar.tail_point
 
@@ -565,10 +565,10 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
 
     total_aircraft_mass = base_config.system.quantities.mass_properties.mass
     total_aircraft_mass.name = "total_aircraft_mass"
-    total_aircraft_mass.set_as_constraint(upper=6*cd.Units.mass.pound_to_kg, scaler=1e-3)
+    total_aircraft_mass.set_as_constraint(upper=6*cd.Units.mass.pound_to_kg, scaler=1/6)
     # total_aircraft_mass.set_as_objective(scaler=1e-3)
 
-    print(base_config.system.quantities.mass_properties.inertia_tensor.value)
+    print(base_config.system.quantities.mass_properties.inertia_tensor)
 
 def define_vlm_analysis(caddee: cd.CADDEE):
     """Run VLM Analsysis"""
@@ -615,15 +615,15 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
 
 
     # this sums the chordwise forces
-    num_spanwise_panels = len(vlm_output.surface_panel_forces[0][0][0].value)
-    num_chordwise_panels = len(vlm_output.surface_panel_force_points[0][0].value)
+    num_spanwise_panels = len(vlm_output.surface_panel_forces[0][0][0])
+    num_chordwise_panels = len(vlm_output.surface_panel_force_points[0][0])
     wing_spanwise_vlm_forces = np.zeros((num_spanwise_panels,3))
     for i in range(num_chordwise_panels-1):
-        wing_spanwise_vlm_forces += vlm_output.surface_panel_forces[0][0][i].value
+        wing_spanwise_vlm_forces += vlm_output.surface_panel_forces[0][0][i]
     # wing_spanwise_vlm_forces = np.sum(vlm_outputs.surface_panel_forces[0][0].value, axis=1)
 
     # 
-    num_chordwise_panels = len(vlm_output.surface_panel_force_points[0][0].value)
+    num_chordwise_panels = len(vlm_output.surface_panel_force_points[0][0])
     if num_chordwise_panels % 2 == 0:
         middle_index = int(num_chordwise_panels/2 - 1) # there is a better way to do this
     else:
@@ -631,7 +631,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
 
     force_points = vlm_output.surface_panel_force_points[0][0][middle_index]
 
-    num_nodes = len(force_points.value)
+    num_nodes = len(force_points)
     # beam_mesh = np.zeros((num_nodes, 3))
  
     beam_mesh = csdl.Variable(value=np.zeros((num_nodes, 3)))
@@ -639,7 +639,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
     # beam_mesh = beam_mesh.set(csdl.slice[:,1], csdl.linear_combination(-wing_span/2, wing_span/2, num_nodes))
     beam_points = csdl.linear_combination(-wing_span/2, wing_span/2, num_nodes)
 
-    for i in range(len(beam_points.value)):
+    for i in range(len(beam_points)):
         beam_mesh = beam_mesh.set(csdl.slice[i,1], beam_points[i])
 
     # beam_mesh[:, 1]  = csdl.linear_combination(-wing_span/2, wing_span/2, num_nodes)
@@ -649,7 +649,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
     loads = csdl.Variable(value=np.zeros((len(wing_spanwise_vlm_forces), 6)))
 
     for j in range(3):
-        for i in range(len(loads[:,0].value)):
+        for i in range(len(loads[:,0])):
             loads = loads.set(csdl.slice[i,j], wing_spanwise_vlm_forces[i,j])
 
     loads = 5 * loads / 2
@@ -668,7 +668,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
 
     carbon_fiber = af.Material(name='carbon_fiber', E=96.2E9/SF, G = 3.16E9/SF, density = 1420)
     beam_radius = csdl.Variable(value=0.1)
-    beam_radius.set_as_design_variable(lower=0.0015875, scaler=1e-3) # needs to be larger than 1/8" for wiring purposes
+    beam_radius.set_as_design_variable(lower=0.0015875, scaler=1/0.0015875) # needs to be larger than 1/8" for wiring purposes
     beam_radius_expanded = csdl.expand(beam_radius, (num_nodes - 1,))
     # beam_1_thickness = csdl.Variable(value=np.ones(num_nodes_1 - 1) * 0.001)
     beam_thickness = csdl.Variable(value=0.0015875) # beam_1_cs = af.CSTube(radius=beam_1_radius, thickness=beam_1_thickness)
@@ -692,7 +692,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
     # frame = af.Frame(beams=[beam], acc=acc)
     # frame.solve()
     beam_displacement = frame.displacement[beam.name]
-    displacement_limit = wing_span.value*0.05
+    displacement_limit = wing_span*0.05
     beam_def_mesh = beam_mesh + beam_displacement
     beam_displacement.set_as_constraint(lower=-displacement_limit,upper=displacement_limit)
     # cg = beam_1.cg
@@ -720,7 +720,7 @@ def wing_weight_model(AR,S,m,p,t,spar_outer_diameter):
     a4 = csdl.Variable(value=-0.5075)
 
     n = 15 # number of points along the chord
-    x_vals = np.linspace(0,c.value,n) # x coordinate of points along the chord
+    x_vals = np.linspace(0,c,n) # x coordinate of points along the chord
     x = csdl.Variable(value=x_vals,name="Wing_Weight_Model_X_Values")
     yc_vals  = np.zeros(n) # y coordinate of the camber line
     yc = csdl.Variable(shape =(n,),value=yc_vals,name="Wing_Weight_Model_YC_Values")
@@ -821,7 +821,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     cruise_rotor_mesh = rotor_meshes.discretizations["cruise_prop_mesh"]
     mesh_vel = cruise_rotor_mesh.nodal_velocities
     cruise_rpm = csdl.Variable(name="cruise_pusher_rpm", shape=(1, ), value=1200) #check this
-    cruise_rpm.set_as_design_variable(upper=2500, lower=1200, scaler=1e-3) #and this
+    cruise_rpm.set_as_design_variable(upper=2500, lower=1200, scaler=1/1200) #and this
     bem_inputs = RotorAnalysisInputs(mesh_parameters = cruise_rotor_mesh, mesh_velocity = mesh_vel, rpm = cruise_rpm)
     bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
     bem_outputs = bem_model.evaluate(bem_inputs)
@@ -847,14 +847,14 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     accel_norm_cruise.name = "cruise_trim"
 
     #This is how the trim residual is set.
-    accel_norm_cruise.set_as_constraint(upper=0, lower=0, scaler=1e-1)
+    #accel_norm_cruise.set_as_constraint(upper=0.1, lower=-0.1, scaler=1e1)
 
     ########### Mission Power Analysis
     cruise_veloicty = cruise.parameters.speed
     R = csdl.Variable(value=10e3) #m
     cruise_time = R/cruise_veloicty #s
     capacity = cruise.quantities.power * cruise_time #Ws
-    capacity.set_as_constraint(lower=0,upper = 131868, scaler = 1e-3)
+    capacity.set_as_constraint(lower=0,upper = 131868, scaler = 1/131868)
     capacity.name = ("Capacity in Ws")
     
     ER = capacity/R
