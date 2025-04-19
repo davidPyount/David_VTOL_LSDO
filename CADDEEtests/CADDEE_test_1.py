@@ -430,7 +430,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     aircraft = base_config.system
 
     conditions = caddee.conditions
-    cruise : cd.aircraft.conditions.CruiseCondition = conditions["cruise"]
+    cruise = conditions["cruise"]
     dynamic_pressure = 0.5 * cruise.quantities.atmos_states.density * cruise.parameters.speed**2
 
     design_gross_weight = csdl.Variable(name="design_gross_weight", value=w_total)
@@ -450,39 +450,45 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     
     # battery_x.set_as_design_variable(lower=5*cd.Units.length.inch_to_m, upper=10*cd.Units.length.inch_to_m, scaler=1)
 
-    wing : cd.aircraft.components.Wing = aircraft.comps["wing"]
+    wing = aircraft.comps["wing"]
     wing_center = (wing.LE_center + wing.TE_center) / 2
     wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
 
-    # approximate the wing cross-section area as an ellipse, rectangle, and triangle.
-    # TO DO: Replace this with CSDL integrator
-
     # these values need to be defined in terms of values passed into the wing component
     wing_span = csdl.sqrt(wing.parameters.AR * wing.parameters.S_ref)
-    #wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=1/8) ########## Look into this
-
-    wing_chord = csdl.sqrt(wing.parameters.S_ref / wing.parameters.AR)
-    wing_thickness_to_chord = 0.12 * wing_chord
-
-    wing_max_t = wing_chord*wing_thickness_to_chord
-    wing_ellipse_a = 0.3*wing_chord
-    wing_ellipse_b = 1/2 * wing_max_t
-    wing_ellipse_area = np.pi * wing_ellipse_a * wing_ellipse_b
-
-    wing_rectangle_area = 0.2*wing_chord * wing_max_t
-
-    wing_triangle_area = 1/2 * wing_max_t * 0.5*wing_chord
-
-    wing_cross_section_area = wing_ellipse_area + wing_rectangle_area + wing_triangle_area
-
-    wing_volume = wing_cross_section_area * wing_span
-
-    wing_mass = wing_volume * density_foam
-    wing.quantities.mass_properties.mass = wing_mass + fuel_weight
-    wing.quantities.mass_properties.cg_vector = 0.56 * wing.LE_center + 0.44 * wing.TE_center # CG is around 44.4% of chord for 4412
-
+    
+    #Run beam analysis
     beam_radius, beam_ID_radius, wing_spars_mass = run_beam(caddee:=caddee, vlm_output=vlm_outputs)
     # wing_spars_mass = csdl.Variable(value=0.15) #temp until run beam is working.
+
+    seth_wing_volume = False
+    if seth_wing_volume:
+        #wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=1/8) ########## Look into this
+
+        wing_chord = csdl.sqrt(wing.parameters.S_ref / wing.parameters.AR)
+        wing_thickness_to_chord = 0.12 * wing_chord
+
+        wing_max_t = wing_chord*wing_thickness_to_chord
+        wing_ellipse_a = 0.3*wing_chord
+        wing_ellipse_b = 1/2 * wing_max_t
+        wing_ellipse_area = np.pi * wing_ellipse_a * wing_ellipse_b
+
+        wing_rectangle_area = 0.2*wing_chord * wing_max_t
+
+        wing_triangle_area = 1/2 * wing_max_t * 0.5*wing_chord
+
+        wing_cross_section_area = wing_ellipse_area + wing_rectangle_area + wing_triangle_area
+
+        wing_volume = wing_cross_section_area * wing_span
+
+        wing_mass = wing_volume * density_foam
+        wing.quantities.mass_properties.mass = wing_mass + fuel_weight
+        wing.quantities.mass_properties.cg_vector = 0.56 * wing.LE_center + 0.44 * wing.TE_center # CG is around 44.4% of chord for 4412
+    else:
+        beam_radius_ft = beam_radius/units.length.foot_to_m
+        wing_weight = wing_mass_model(wing.parameters.AR,wing.parameters.S_ref,4,4,12,beam_radius)*units.mass.pound_to_kg
+        wing.quantities.mass_properties.mass = wing_weight
+        wing.quantities.mass_properties.cg_vector = 0.56 * wing.LE_center + 0.44 * wing.TE_center # CG is around 44.4% of chord for 4412
 
     wing_spars_mass = wing_spars_mass * 2
 
@@ -509,7 +515,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     # fuselage.quantities.mass_properties.cg_vector = wing_center + np.array([0., 0., 0.5])
     fuselage.quantities.mass_properties.cg_vector = wing_qc
 
-    h_tail : cd.aircraft.components.Wing = aircraft.comps["h_tail"]
+
     
     # approximate the cross-sectional area of the h-stab as an ellipse meeting a triangle at quarter chord
 
@@ -518,29 +524,36 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     # I think it also fine to just rely on h_tail.parameters
     # approximate the NACA 0012 as an ellipse and a triangle
 
-    h_tail_span = csdl.sqrt(h_tail.parameters.AR * h_tail.parameters.S_ref)
-    h_tail_chord = csdl.sqrt(h_tail.parameters.S_ref / h_tail.parameters.AR)
-    h_tail_thickness_to_chord = 0.12 * h_tail_chord
+    #h_tail
+    h_tail = aircraft.comps["h_tail"]
+    if seth_wing_volume:
+        h_tail_span = csdl.sqrt(h_tail.parameters.AR * h_tail.parameters.S_ref)
+        h_tail_chord = csdl.sqrt(h_tail.parameters.S_ref / h_tail.parameters.AR)
+        h_tail_thickness_to_chord = 0.12 * h_tail_chord
 
-    h_tail_max_t = h_tail_chord*h_tail_thickness_to_chord
-    h_tail_ellipse_a = 0.3*h_tail_chord
-    h_tail_ellipse_b = 1/2 * h_tail_max_t
-    h_tail_ellipse_area = np.pi * h_tail_ellipse_a * h_tail_ellipse_b
+        h_tail_max_t = h_tail_chord*h_tail_thickness_to_chord
+        h_tail_ellipse_a = 0.3*h_tail_chord
+        h_tail_ellipse_b = 1/2 * h_tail_max_t
+        h_tail_ellipse_area = np.pi * h_tail_ellipse_a * h_tail_ellipse_b
 
-    h_tail_triangle_area = 1/2 * h_tail_max_t * 0.7*h_tail_chord
+        h_tail_triangle_area = 1/2 * h_tail_max_t * 0.7*h_tail_chord
 
-    h_tail_cross_section_area = h_tail_ellipse_area + h_tail_triangle_area
+        h_tail_cross_section_area = h_tail_ellipse_area + h_tail_triangle_area
 
-    h_tail_volume = h_tail_cross_section_area * h_tail_span
+        h_tail_volume = h_tail_cross_section_area * h_tail_span
+        
+        h_tail_mass = density_foam * h_tail_volume
+        # h_tail_mass = ga_aviation_weights.evaluate_horizontal_tail_weight(
+        #     S_ref=h_tail.parameters.S_ref,
+        # )
+    else:
+        h_tail_mass = wing_mass_model(h_tail.parameters.AR,h_tail.parameters.S_ref,0,0,12,0)
     
-    h_tail_mass = density_foam * h_tail_volume
-    # h_tail_mass = ga_aviation_weights.evaluate_horizontal_tail_weight(
-    #     S_ref=h_tail.parameters.S_ref,
-    # )
     h_tail.quantities.mass_properties.mass = h_tail_mass
     h_tail.quantities.mass_properties.cg_vector = 0.6 * h_tail.LE_center + 0.4 * h_tail.TE_center
     
-    v_tail : cd.aircraft.components.Wing = aircraft.comps["v_tail"]
+    #V_tail
+    v_tail = aircraft.comps["v_tail"]
 
     v_tail_span = csdl.sqrt(v_tail.parameters.AR * v_tail.parameters.S_ref)
     v_tail_chord = csdl.sqrt(v_tail.parameters.S_ref / v_tail.parameters.AR)
@@ -558,17 +571,12 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     v_tail_volume = v_tail_cross_section_area * v_tail_span
 
     v_tail_mass = v_tail_volume * density_foam
-    # v_tail_mass = ga_aviation_weights.evaluate_vertical_tail_weight(
-    #     S_ref=v_tail.parameters.S_ref,
-    #     AR=v_tail.parameters.AR,
-    #     thickness_to_chord=0.1,
-    #     sweep_c4=np.deg2rad(20),
-    # )
     v_tail.quantities.mass_properties.mass = v_tail_mass
     v_tail.quantities.mass_properties.cg_vector = 0.6 * h_tail.LE_center + 0.4 * h_tail.TE_center
-    # trying to get v_tail.LE_center fails because vtail does not have an FFD? Use h-tail as reference instead
+    # trying to get v_tail.LE_center fails because vtail does not have an FFD. Use h-tail as reference instead
     # v_tail.quantities.mass_properties.cg_vector = 0.6 * v_tail.LE_center + 0.4 * v_tail.TE_center
     
+    #Skeleton
     skeleton = aircraft.comps["skeleton"]
 
     skeleton_mass = 0.7 * cd.Units.mass.pound_to_kg
@@ -577,11 +585,13 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     # CG pulled from CAD of skeleton assembly (battery not included)
     skeleton.quantities.mass_properties.cg_vector = fuselage.nose_point + np.array([8.65, 0, 2.04])*cd.Units.length.inch_to_m
 
+    #Cruise motor
     cruise_motor = aircraft.comps["cruise_motor"]
     cruise_motor_mass = csdl.Variable(name="cruise_motor_mass", value=72/1000) # from https://www.cobramotorsusa.com/motors-2217-20.html
     cruise_motor.quantities.mass_properties.mass = cruise_motor_mass
     cruise_motor.quantities.mass_properties.cg_vector = fuselage.nose_point + np.array([-1.299*cd.Units.length.inch_to_m, 0.,0.])
 
+    #Booms
     # boom assemblies are centered at CG. Consist of boom, wing mount, motor, and motor mount. Treat as single object on each side
     fl_boom : cd.aircraft.components.Fuselage = aircraft.comps["fl_boom"]
     fr_boom = cd.aircraft.components.Fuselage = aircraft.comps["fr_boom"]
@@ -614,7 +624,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     main_spar_OD = half_boom_OD
     main_spar_ID = half_boom_ID
     main_spar_density = half_boom_density
-    main_spar : cd.aircraft.components.Fuselage = aircraft.comps["main_spar"]
+    main_spar = aircraft.comps["main_spar"]
     main_spar_length = csdl.norm(main_spar.nose_point - main_spar.tail_point)
     main_spar_volume = np.pi*((main_spar_OD/2)**2 - (main_spar_ID/2)**2) * main_spar_length
     main_spar_mass = main_spar_density * main_spar_volume
@@ -622,24 +632,24 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     main_spar.quantities.mass_properties.mass = main_spar_mass
     main_spar.quantities.mass_properties.cg_vector = main_spar.nose_point - main_spar.tail_point
 
-    fl_rotor: cd.aircraft.components.Rotor = aircraft.comps["fl_rotor"]
+    fl_rotor = aircraft.comps["fl_rotor"]
     fl_rotor_mass = csdl.Variable(name="fl_rotor_mass", value = 0.06625*cd.Units.mass.pound_to_kg)
     fl_rotor.quantities.mass_properties.mass = fl_rotor_mass
     fl_rotor.quantities.mass_properties.cg_vector = fl_boom.nose_point
     
-    rl_rotor : cd.aircraft.components.Rotor = aircraft.comps["rl_rotor"]
+    rl_rotor = aircraft.comps["rl_rotor"]
     rl_rotor = aircraft.comps["rl_rotor"]
     rl_rotor_mass = fl_rotor_mass
     rl_rotor.quantities.mass_properties.mass = fl_rotor_mass
     rl_rotor.quantities.mass_properties.cg_vector = rl_boom.tail_point
 
-    fr_boom : cd.aircraft.components.Fuselage = aircraft.comps["fr_boom"]
+    fr_boom = aircraft.comps["fr_boom"]
     fr_rotor = aircraft.comps["fr_rotor"]
     fr_rotor_mass = fl_rotor_mass
     fr_rotor.quantities.mass_properties.mass = fr_rotor_mass
     fr_rotor.quantities.mass_properties.cg_vector = fr_boom.nose_point
 
-    rr_boom : cd.aircraft.components.Fuselage = aircraft.comps["rr_boom"]
+    rr_boom = aircraft.comps["rr_boom"]
     rr_rotor = aircraft.comps["rr_rotor"]
     rr_rotor_mass = fl_rotor_mass
     rr_rotor.quantities.mass_properties.mass = rr_rotor_mass
@@ -668,7 +678,6 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     total_aircraft_mass = base_config.system.quantities.mass_properties.mass
     total_aircraft_mass.name = "total_aircraft_mass"
     #total_aircraft_mass.set_as_constraint(upper=6*cd.Units.mass.pound_to_kg, scaler=1e-3) #This will probably fail optimization still.
-
 
     print(base_config.system.quantities.mass_properties.inertia_tensor.value)
 
@@ -791,7 +800,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
 
     return beam_radius, beam_ID_radius, mass
 
-def wing_weight_model(AR,S,m,p,t,spar_outer_diameter):
+def wing_mass_model(AR,S,m,p,t,spar_outer_diameter):
     #All inputs need to be CSDL variables!
     b = csdl.sqrt(AR*S) #ft #This should be a csdl variable at this point, check that.
     c = b/AR #ft #This should be a csdl variable at this point, check that.
@@ -807,8 +816,8 @@ def wing_weight_model(AR,S,m,p,t,spar_outer_diameter):
     a3 =  csdl.Variable(value=1.4215)
     a4 = csdl.Variable(value=-0.5075)
 
-    n = 15 # number of points along the chord
-    x_vals = np.linspace(0,c,n) # x coordinate of points along the chord
+    n = 8 # number of points along the chord
+    x_vals = np.linspace(0,c.value,n) # x coordinate of points along the chord
     x = csdl.Variable(value=x_vals,name="Wing_Weight_Model_X_Values")
     yc_vals  = np.zeros(n) # y coordinate of the camber line
     yc = csdl.Variable(shape =(n,),value=yc_vals,name="Wing_Weight_Model_YC_Values")
@@ -824,25 +833,21 @@ def wing_weight_model(AR,S,m,p,t,spar_outer_diameter):
     xl = csdl.Variable(shape =(n,),value=xl_vals,name="Wing_Weight_Model_XL_Values")
     yl_vals  = np.zeros(n) # y coordinate of the lower surface
     yl = csdl.Variable(shape =(n,),value=yl_vals,name="Wing_Weight_Model_YL_Values")
-    for i in range(n):
-        if  (x[i].value/c.value < p.value):
-            yc[i]  = (c*m/p**2)*(2*p*(x[i]/c)-(x[i]/c)**2)
-            dyc[i] = ((2*m)/p**2)*(p-(x[i]/c))
+    for i in csdl.frange(n):
+        if  (x[i].value/c.value < p):
+            yc  = yc.set(csdl.slice[i],(c*m/p**2)*(2*p*(x[i]/c)-(x[i]/c)**2))
+            dyc = dyc.set(csdl.slice[i],((2*m)/p**2)*(p-(x[i]/c)))
         else:
-            yc[i]  = (c*m/(1-p)**2)*(1-2*p+2*p*(x[i]/c)-(x[i]/c)**2)
-            dyc[i] = ((2*m)/(1-p)**2)*(p-(x[i]/c))
-            
-    for i in range(n):
-        yt[i] = (t*c)*(a0*m.sqrt(x[i]/c)+a1*(x[i]/c)+a2*(x[i]/c)**2+a3*(x[i]/c)**3+a4*(x[i]/c)**4)
-        teta  = m.atan(dyc[i])
-        xu[i] = x[i]  - yt[i]*m.sin(teta)
-        xl[i] = x[i]  + yt[i]*m.sin(teta)
-        yu[i] = yc[i] + yt[i]*m.cos(teta)
-        yl[i] = yc[i] - yt[i]*m.cos(teta)
-
-    # for i in range(n):
-    #     if ()
-
+            yc  = yc.set(csdl.slice[i],(c*m/(1-p)**2)*(1-2*p+2*p*(x[i]/c)-(x[i]/c)**2))
+            dyc = dyc.set(csdl.slice[i]((2*m)/(1-p)**2)*(p-(x[i]/c)))
+            c
+    for i in csdl.frange(n):
+        yt = yt.set(csdl.slice[i],(t*c)*(a0*csdl.sqrt(x[i]/c)+a1*(x[i]/c)+a2*(x[i]/c)**2+a3*(x[i]/c)**3+a4*(x[i]/c)**4))
+        teta  = csdl.arctan(dyc[i])
+        xu = xu.set(csdl.slice[i],x[i]  - yt[i]*csdl.sin(teta))
+        xl = xl.set(csdl.slice[i],x[i]  + yt[i]*csdl.sin(teta))
+        yu = yu.set(csdl.slice[i],yc[i]  + yt[i]*csdl.cos(teta))
+        yl = yl.set(csdl.slice[i],yc[i]  - yt[i]*csdl.cos(teta))
 
     # plot.xlim(-0.2,c+0.2)
     # plot.ylim(-c/3,c/3)
@@ -862,19 +867,18 @@ def wing_weight_model(AR,S,m,p,t,spar_outer_diameter):
 
     foam_density = csdl.Variable(value=1.5) #lb/ft**3 #This is an aproximation to get the code working
     volume_wing = total_area * b
-    volume_spars = 2*m.pi*(spar_outer_diameter/2/12)**2*b #Volume of both spars in ft^3, spar outer diamter in in^3
+    volume_spars = 2*np.pi*(spar_outer_diameter/2/12)**2*b #Volume of both spars in ft^3, spar outer diamter in in^3
     volume_total = volume_wing-volume_spars
-    weight = volume_total*foam_density
-    return weight
+    mass = volume_total*foam_density
+    return mass
 
 def csdlTrapIntegrator(x,y): #I have no idea if this works correctly
-    print("test")
     if len(x) != len(y):
         raise ValueError("X data and Y data must have same length")
     #integral = csdl.Variable(shape = (1,0) name = 'Area of Airfoil', value = 0)
     integral = 0
     integral = csdl.Variable(shape=(1,),name="Airfoil_Area",value = integral)
-    for i in range(len(x) - 1):
+    for i in csdl.frange(len(x) - 1):
         integral = integral + (x[i+1] - x[i]) * (y[i] + y[i+1]) / 2.0
     return integral
 
@@ -888,7 +892,6 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     vlm_forces = vlm_output.total_force
     vlm_moments = vlm_output.total_moment
 
-    ###################################### BEM STUFF, not using qst (quasi-steady transition)
     # Drag build-up
     #drag_build_up_model = cd.aircraft.models.aero.compute_drag_build_up
 
@@ -896,12 +899,12 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     fuselage = aircraft.comps["fuselage"]
     h_tail = aircraft.comps["h_tail"]
     v_tail = aircraft.comps['v_tail']
-    # booms = [aircraft.comps["boom_FR"], aircraft.comps["boom_FL"], aircraft.comps["boom_BR"], aircraft.comps["boom_BL"]]
 
     #This fails for weird reasons having to do with none values for certain drag parameters.
     # drag_build_up = drag_build_up_model(cruise.quantities.ac_states, cruise.quantities.atmos_states,
     #                                     wing.parameters.S_ref, [wing, fuselage, h_tail, v_tail])
     
+    ###################################### BEM STUFF, not using qst (quasi-steady transition)
     cruise_power = {}
 
     # BEM solver
@@ -944,12 +947,12 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
         mass_properties=cruise_config.system.quantities.mass_properties,
     )
 
-    # t2d = long_stability_results.time_2_double_phugoid
-    # t2d.name = "time2double"
-    # drph = long_stability_results.damping_ratio_phugoid
-    # drph.set_as_constraint(upper=0.045,lower=0.04,scaler=1/0.04)
-    # drsp = long_stability_results.damping_ratio_short_period
-    # drsp.set_as_constraint(lower=0.7,upper=2,scaler=1/0.7)
+    t2d = long_stability_results.time_2_double_phugoid
+    t2d.name = "time2double"
+    drph = long_stability_results.damping_ratio_phugoid
+    drph.set_as_constraint(upper=0.045,lower=0.04,scaler=1/0.04)
+    drsp = long_stability_results.damping_ratio_short_period
+    drsp.set_as_constraint(lower=0.7,upper=2,scaler=1/0.7)
 
     ########### Mission Power Analysis
     cruise_veloicty = cruise.parameters.speed
@@ -961,12 +964,6 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     
     ER = energy/R
     ER.name = "E/R"
-
-    #Davids wing weight model testing stuff
-    # aircraft = caddee.base_configuration.system
-    # wing = aircraft.comps["wing"]
-    #weight = wing_weight_model(wing.parameters.AR,wing.parameters.S_ref,csdl.Variable(value=4),csdl.Variable(value=4),csdl.Variable(value=12),csdl.Variable(value=0.2))
-    #print(f"The calculated wing weight is {weight}")
 
     #SET AS OBJECTIVE
     ER.set_as_objective()
@@ -1003,9 +1000,9 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
     # jax_sim.check_optimization_derivatives()
 
     # Make CSDLAlphaProblem and initialize optimizer
-    problem = CSDLAlphaProblem(problem_name="induced_drag_minimization", simulator=jax_sim)
+    problem = CSDLAlphaProblem(problem_name="Energy/Range Minimization Problem", simulator=jax_sim)
     optimizer = SLSQP(problem=problem)
-    optimizer.default_solver_options["maxiter"] = 1000 #Woah
+    optimizer.default_solver_options["maxiter"] = 100000 #Woah
     # Solve optimization problem
     optimizer.solve()
     optimizer.print_results()
