@@ -7,18 +7,19 @@ from modopt import CSDLAlphaProblem, SLSQP
 from CADDEE_alpha.utils.units import Units
 import lsdo_function_spaces as lfs
 import aframe as af
-import aeroelastic_coupling_utils as acu
 import os #for relative path import
-import math as mth
 from BladeAD.core.airfoil.ml_airfoil_models.NACA_4412.naca_4412_model import NACA4412MLAirfoilModel
 from BladeAD.utils.parameterization import BsplineParameterization
 from BladeAD.core.BEM.bem_model import BEMModel
 from BladeAD.core.pitt_peters.pitt_peters_model import PittPetersModel
 from BladeAD.utils.var_groups import RotorAnalysisInputs, RotorMeshParameters
+from CADDEE_alpha.core.mesh.meshers import CamberSurface
 units = Units()
 
 #TO DO
-#Updated weights model -> create static stability criteria (both vtol and FW) -> informs spar length (tail arm), boom placement
+#CSDL integrator
+#Static stability constraints
+#Make it converge
 
 # Start the CSDL recorder
 recorder = csdl.Recorder(inline=True, expand_ops=True)
@@ -74,6 +75,17 @@ main_spar_len = 3 * ft2m
 # wing booms
 wing_boom_len = 30/12 * ft2m
 wing_boom_y = 0.457
+
+x_wing_LE = 0.203
+y_wing_LE = span/2
+z_wing_LE = 0.076
+x_wing_TE = x_wing_LE + wingchord
+
+x_h_tail_LE = 0.851
+y_h_tail_LE = h_stab_span/2
+z_h_tail_LE = 0.025
+x_h_tail_TE = x_h_tail_LE + h_stab_chord
+x_h_tail_qc = x_h_tail_LE + h_stab_chord/4
 
 # cruise conditions
 alt = 0
@@ -152,8 +164,8 @@ def define_base_config(caddee : cd.CADDEE):
     wing_area.set_as_design_variable(upper=1.2 * wing_S, lower=0.8 * wing_S, scaler=1/16)
     # wing_span.set_as_design_variable(upper=1.5 * span, lower = 0.8 * span, scaler=1/8)
     # wing_chord.set_as_design_variable(upper = 1.2 * wingchord, lower = 0.8 * wingchord, scaler = 1/16)
-    wing_root_twist.set_as_design_variable(upper=np.deg2rad(5), lower=np.deg2rad(-5), scaler=4)
-    wing_tip_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=2)
+    wing_root_twist.set_as_design_variable(upper=np.deg2rad(15), lower=np.deg2rad(-15), scaler=4)
+    wing_tip_twist.set_as_design_variable(upper=np.deg2rad(15), lower=np.deg2rad(-15), scaler=2)
     
     wing = cd.aircraft.components.Wing(
         AR=aspect_ratio, S_ref=wing_area, 
@@ -167,7 +179,7 @@ def define_base_config(caddee : cd.CADDEE):
 
     # Connect wing to fuselage at the quarter chord
     base_config.connect_component_geometries(fuselage, wing, 0.75 * wing.LE_center + 0.25 * wing.TE_center)
-    # base_config.connect_component_geometries(main_spar, h_tail, h_tail.TE_center)
+    
 
     #Making hstab parameters changeable.
     h_stab_AR = h_stab_span/h_stab_chord
@@ -176,7 +188,7 @@ def define_base_config(caddee : cd.CADDEE):
     h_stab_tip_twist = csdl.Variable(name="h_stab_tip_twist", value=np.deg2rad(0))
 
     # Set design variables for wing
-    h_stab_AR.set_as_design_variable(upper=1.5 * wing_AR, lower=0.5 * wing_AR, scaler=1/8)
+    h_stab_AR.set_as_design_variable(upper=1.5 * wing_AR, lower=0.8 * wing_AR, scaler=1/8)
     h_stab_root_twist.set_as_design_variable(upper=np.deg2rad(5), lower=np.deg2rad(-5), scaler=4)
     h_stab_tip_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=2)
 
@@ -189,16 +201,12 @@ def define_base_config(caddee : cd.CADDEE):
 
     # Assign tail component to aircraft
     aircraft.comps["h_tail"] = h_tail
-    #base_config.connect_component_geometries(fuselage, h_tail, h_tail.TE_center) #.TE_Center doesnt work for some reason
-
+    base_config.connect_component_geometries(fuselage, h_tail, h_tail.TE_center) #.TE_Center doesnt work for some reason
     # Make vertical tail geometry & componen
     v_tail_geometry = aircraft.create_subgeometry(search_names=["VStab"])
 
     v_tail_AR = csdl.Variable(name="v_tail_AR", value=v_stab_AR)
     v_tail_area = csdl.Variable(name="v_tail_area", value=v_stab_S)
-
-    # v_tail_AR.set_as_design_variable(lower=0.8 * v_stab_AR, upper=1.5 * v_stab_AR, scaler=1/4)
-    # v_tail_area.set_as_design_variable(lower=0.8 * v_stab_S, upper=1.2 * v_stab_S, scaler=1/4)
     
     v_tail = cd.aircraft.components.Wing(
         AR=v_tail_AR, S_ref=v_tail_area, geometry=v_tail_geometry, 
@@ -213,26 +221,26 @@ def define_base_config(caddee : cd.CADDEE):
 
     # lifting rotors (each imported separately)
     fl_prop_geom = aircraft.create_subgeometry(search_names=["FrontLeftLiftRotor"])
-    fl_prop = cd.Component() #This is just a fancy container for mass properties
+    fl_prop = cd.Component(geometry=fl_prop_geom) #This is just a fancy container for mass properties
     aircraft.comps["fl_rotor"] = fl_prop
 
     rl_prop_geom = aircraft.create_subgeometry(search_names=["BackLeftLiftRotor"])
-    rl_prop = cd.Component()
+    rl_prop = cd.Component(geometry=rl_prop_geom)
     aircraft.comps["rl_rotor"] = rl_prop
 
     fr_prop_geom = aircraft.create_subgeometry(search_names=["FrontRightLiftRotor"])
-    fr_prop = cd.Component()
+    fr_prop = cd.Component(geometry=fr_prop_geom)
     aircraft.comps["fr_rotor"] = fr_prop
 
     rr_prop_geom = aircraft.create_subgeometry(search_names=["BackRightLiftRotor"])
-    rr_prop = cd.Component()
+    rr_prop = cd.Component(geometry=rr_prop_geom)
     aircraft.comps["rr_rotor"] = rr_prop
 
     lift_rotors = [fl_prop, fr_prop, rl_prop, rr_prop]
 
     #Booms
     wing_boom_length = csdl.Variable(value=wing_boom_len,name='Wing Boom Length')
-    wing_boom_length.set_as_constraint(upper = 50/12*ft2m, lower = 1*ft2m, scaler=1e-1) #these limits are currently arbitrary.
+    #wing_boom_length.set_as_constraint(upper = 50/12*ft2m, lower = 1*ft2m, scaler=1e-1) #these limits are currently arbitrary.
 
     fl_boom_geom = aircraft.create_subgeometry(search_names = ['FrontLeftBoom'])
     fl_boom = cd.aircraft.components.Fuselage(length=wing_boom_length/2, geometry=fl_boom_geom)
@@ -279,47 +287,94 @@ def define_base_config(caddee : cd.CADDEE):
     aircraft.comps["tail_mount"] = tail_mount
 
     # # lift rotors to lift booms
-    # base_config.connect_component_geometries(fr_boom, fr_prop, fr_boom.nose_point)
-    # base_config.connect_component_geometries(fl_boom, fl_prop, fl_boom.nose_point)
-    # base_config.connect_component_geometries(rr_boom, rr_prop, rr_boom.tail_point)
-    # base_config.connect_component_geometries(rl_boom, rl_prop, rl_boom.tail_point)
+    base_config.connect_component_geometries(fr_boom, fr_prop, fr_boom.nose_point)
+    base_config.connect_component_geometries(fl_boom, fl_prop, fl_boom.nose_point)
+    base_config.connect_component_geometries(rr_boom, rr_prop, rr_boom.tail_point)
+    base_config.connect_component_geometries(rl_boom, rl_prop, rl_boom.tail_point)
 
-    # main spar to fuselage
-    base_config.connect_component_geometries(main_spar, fuselage, main_spar.nose_point)
+    # # main spar to fuselage
+    # base_config.connect_component_geometries(main_spar, fuselage, main_spar.nose_point)
+
     # wing booms to wing
-    base_config.connect_component_geometries(fr_boom, wing, fr_boom.tail_point)
-    base_config.connect_component_geometries(fl_boom, wing, fl_boom.tail_point)
-    base_config.connect_component_geometries(rr_boom, wing, rr_boom.nose_point)
-    base_config.connect_component_geometries(rl_boom, wing, rl_boom.nose_point)
+    # base_config.connect_component_geometries(fr_boom, wing, fr_boom.tail_point)
+    # base_config.connect_component_geometries(fl_boom, wing, fl_boom.tail_point)
+    # base_config.connect_component_geometries(rr_boom, wing, rr_boom.nose_point)
+    # base_config.connect_component_geometries(rl_boom, wing, rl_boom.nose_point)
 
-    ## MAKE MESHES ###################################################################
     # Meshing
     mesh_container = base_config.mesh_container
 
+    # wing mesh
+    plotting = False
+    
+    leading_edge_line_parametric = wing_geometry.project(np.linspace(np.array([-x_wing_LE, -y_wing_LE, z_wing_LE]), np.array([-x_wing_LE, y_wing_LE, z_wing_LE]), wing_spanwise_nodes), 
+                                 direction=np.array([0., 0., -1.]), grid_search_density_parameter=20.,plot=False)
+    trailing_edge_line_parametric = wing_geometry.project(np.linspace(np.array([-x_wing_TE, -y_wing_LE, z_wing_LE + 0.1]), np.array([-x_wing_TE, y_wing_LE, z_wing_LE + 0.1]), wing_spanwise_nodes), 
+                                    direction=np.array([0., 0., -1.]), grid_search_density_parameter=20.,plot=False)
+    leading_edge_line = wing_geometry.evaluate(leading_edge_line_parametric)
+    trailing_edge_line = wing_geometry.evaluate(trailing_edge_line_parametric)
+    chord_surface = csdl.linear_combination(leading_edge_line, trailing_edge_line, wing_chordwise_nodes)
+    wing_geometry_upper_surface_wireframe_parametric = wing_geometry.project(chord_surface.value.reshape((wing_chordwise_nodes,wing_spanwise_nodes,3))+np.array([0., 0., -0.1]), 
+                                        direction=np.array([0., 0., 1.]), plot=False, grid_search_density_parameter=10.)
+    wing_geometry_lower_surface_wireframe_parametric = wing_geometry.project(chord_surface.value.reshape((wing_chordwise_nodes,wing_spanwise_nodes,3))+np.array([0., 0., 0.1]), 
+                                        direction=np.array([0., 0., -1.]), plot=False, grid_search_density_parameter=10.)
+    upper_surface_wireframe = wing_geometry.evaluate(wing_geometry_upper_surface_wireframe_parametric)
+    lower_surface_wireframe = wing_geometry.evaluate(wing_geometry_lower_surface_wireframe_parametric)
+    wing_chord_surface = csdl.linear_combination(upper_surface_wireframe, lower_surface_wireframe, 1).reshape((wing_chordwise_nodes, wing_spanwise_nodes, 3))
+    # wing_geometry.plot_meshes([wing_chord_surface])
+
+    # h-tail mesh
+    leading_edge_line_parametric = h_tail_geometry.project(np.linspace(np.array([-x_h_tail_LE, -y_h_tail_LE, z_h_tail_LE]), np.array([-x_h_tail_LE, y_h_tail_LE, z_h_tail_LE]), tail_spanwise_nodes), 
+                                 direction=np.array([0., 0., -1.]), grid_search_density_parameter=20.,plot=plotting)
+    trailing_edge_line_parametric = h_tail_geometry.project(np.linspace(np.array([-x_h_tail_TE, -y_h_tail_LE, z_h_tail_LE + 0.1]), np.array([-x_h_tail_TE, y_h_tail_LE, z_h_tail_LE + 0.1]), tail_spanwise_nodes), 
+                                    direction=np.array([0., 0., -1.]), grid_search_density_parameter=20.,plot=plotting)
+    leading_edge_line = h_tail_geometry.evaluate(leading_edge_line_parametric)
+    trailing_edge_line = h_tail_geometry.evaluate(trailing_edge_line_parametric)
+    chord_surface = csdl.linear_combination(leading_edge_line, trailing_edge_line, tail_chordwise_nodes)
+    h_tail_geometry_upper_surface_wireframe_parametric = h_tail_geometry.project(chord_surface.value.reshape((tail_chordwise_nodes,tail_spanwise_nodes,3))+np.array([0., 0., 0.1]), 
+                                        direction=np.array([0., 0., -1.]), plot=plotting, grid_search_density_parameter=10.)
+    h_tail_geometry_lower_surface_wireframe_parametric = h_tail_geometry.project(chord_surface.value.reshape((tail_chordwise_nodes,tail_spanwise_nodes,3))+np.array([0., 0., -0.1]), 
+                                        direction=np.array([0., 0., 1.]), plot=plotting, grid_search_density_parameter=10.)
+    upper_surface_wireframe = h_tail_geometry.evaluate(h_tail_geometry_upper_surface_wireframe_parametric)
+    lower_surface_wireframe = h_tail_geometry.evaluate(h_tail_geometry_lower_surface_wireframe_parametric)
+    h_tail_chord_surface = csdl.linear_combination(upper_surface_wireframe, lower_surface_wireframe, 1).reshape((tail_chordwise_nodes, tail_spanwise_nodes, 3))
+    # h_tail_geometry.plot_meshes([h_tail_chord_surface])
+
     # H-Tail 
-    tail_chord_surface = cd.mesh.make_vlm_surface(
-        wing_comp=h_tail,
-        num_chordwise=1, 
-        num_spanwise=4, # ? decreased for speed, bump this up later
-    )
+    # tail_chord_surface = cd.mesh.make_vlm_surface(
+    #     wing_comp=h_tail,
+    #     num_chordwise=h_tail_chordwise_panels, 
+    #     num_spanwise=4,
+        # plot=True
+    # )
 
     # Wing chord surface (lifting line)
-    wing_chord_surface = cd.mesh.make_vlm_surface(
-        wing_comp=wing,
-        num_chordwise=3, # ? decreased for speed, bump this up later
-        num_spanwise=4,
-    )
+    # wing_chord_surface = cd.mesh.make_vlm_surface(
+    #     wing_comp=wing,
+    #     num_chordwise=wing_chordwise_panels, 
+    #     num_spanwise=4,
+    #     # plot=True
+    # )
 
-    
+    wing_discretization = CamberSurface(nodal_coordinates = wing_chord_surface)
+    wing_discretization._upper_wireframe_para = wing_geometry_upper_surface_wireframe_parametric
+    wing_discretization._lower_wireframe_para = wing_geometry_lower_surface_wireframe_parametric
+    wing_discretization._geom = wing_geometry
+    wing_discretization._num_chord_wise = wing_chordwise_panels
+    wing_discretization._num_spanwise = wing_spanwise_panels
+
+    h_tail_discretization = CamberSurface(nodal_coordinates = h_tail_chord_surface)
+    h_tail_discretization._upper_wireframe_para = h_tail_geometry_upper_surface_wireframe_parametric
+    h_tail_discretization._lower_wireframe_para = h_tail_geometry_lower_surface_wireframe_parametric
+    h_tail_discretization._geom = h_tail_geometry
+    h_tail_discretization._num_chord_wise = h_tail_chordwise_panels
+    h_tail_discretization._num_spanwise = h_tail_spanwise_panels
+
     vlm_mesh = cd.mesh.VLMMesh()
-    vlm_mesh.discretizations["wing_chord_surface"] = wing_chord_surface
-    vlm_mesh.discretizations["h_tail_chord_surface"] = tail_chord_surface
-    # vlm_mesh.discretizations["v_tail_chord_surface"] = wing_chord_surface
-
-
-
-
-
+    # vlm_mesh.discretizations["wing_chord_surface"] = wing_chord_surface
+    # vlm_mesh.discretizations["h_tail_chord_surface"] = tail_chord_surface
+    vlm_mesh.discretizations["wing_chord_surface"] = wing_discretization
+    vlm_mesh.discretizations["h_tail_chord_surface"] = h_tail_discretization
 
 
     #ROTOR MESHING FOR BEM
@@ -338,9 +393,6 @@ def define_base_config(caddee : cd.CADDEE):
     base_config.connect_component_geometries(fuselage, cruise_prop, connection_point=fuselage.nose_point)
 
 
-
-
-    
     # Assign mesh to mesh container
     mesh_container["vlm_mesh"] = vlm_mesh
     mesh_container["rotor_meshes"] = rotor_meshes
@@ -362,7 +414,7 @@ def define_conditions(caddee: cd.CADDEE):
     base_config = caddee.base_configuration
 
     pitch_angle = csdl.Variable(name="pitch_angle", value=0)
-    pitch_angle.set_as_design_variable(upper=np.deg2rad(5), lower=np.deg2rad(-5), scaler=4)
+    pitch_angle.set_as_design_variable(upper=np.deg2rad(20), lower=np.deg2rad(-20), scaler=4)
     cruise = cd.aircraft.conditions.CruiseCondition(
         altitude=0,
         range=100,
@@ -429,8 +481,8 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     wing.quantities.mass_properties.mass = wing_mass + fuel_weight
     wing.quantities.mass_properties.cg_vector = 0.56 * wing.LE_center + 0.44 * wing.TE_center # CG is around 44.4% of chord for 4412
 
-    #beam_radius, beam_ID_radius, wing_spars_mass = run_beam(caddee:=caddee, vlm_outputs=vlm_outputs)
-    wing_spars_mass = csdl.Variable(value=0.15) #temp until run beam is working.
+    beam_radius, beam_ID_radius, wing_spars_mass = run_beam(caddee:=caddee, vlm_output=vlm_outputs)
+    # wing_spars_mass = csdl.Variable(value=0.15) #temp until run beam is working.
 
     wing_spars_mass = wing_spars_mass * 2
 
@@ -616,19 +668,19 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     total_aircraft_mass = base_config.system.quantities.mass_properties.mass
     total_aircraft_mass.name = "total_aircraft_mass"
     #total_aircraft_mass.set_as_constraint(upper=6*cd.Units.mass.pound_to_kg, scaler=1e-3) #This will probably fail optimization still.
-    # total_aircraft_mass.set_as_objective(scaler=1e-3)
+
 
     print(base_config.system.quantities.mass_properties.inertia_tensor.value)
 
 def define_vlm_analysis(caddee: cd.CADDEE):
-    """Run VLM Analsysis"""
+    """Define the analysis of performed on the aircraft."""
     cruise : cd.aircraft.conditions.CruiseCondition = caddee.conditions["cruise"]
     cruise_config = cruise.configuration
     mesh_container = cruise_config.mesh_container
     tail = cruise_config.system.comps["h_tail"]
 
     elevator_deflection = csdl.Variable(name="elevator", value=0)
-    elevator_deflection.set_as_design_variable(lower=np.deg2rad(-10), upper=np.deg2rad(10), scaler=2)
+    elevator_deflection.set_as_design_variable(lower=np.deg2rad(-15), upper=np.deg2rad(15), scaler=2)
     tail.actuate(elevator_deflection)
 
     # Re-evaluate meshes and compute nodal velocities
@@ -636,10 +688,13 @@ def define_vlm_analysis(caddee: cd.CADDEE):
 
     vlm_mesh = mesh_container["vlm_mesh"]
     wing_chord_surface = vlm_mesh.discretizations["wing_chord_surface"]
-    h_tail_chord_surface = vlm_mesh.discretizations["h_tail_chord_surface"]
+    # h_tail_chord_surface = vlm_mesh.discretizations["h_tail_chord_surface"]
 
-    lattice_coordinates = [wing_chord_surface.nodal_coordinates, h_tail_chord_surface.nodal_coordinates]
-    lattice_nodal_velocities = [wing_chord_surface.nodal_velocities, h_tail_chord_surface.nodal_velocities]
+    lattice_coordinates = [wing_chord_surface.nodal_coordinates]
+    # lattice_coordinates = [wing_chord_surface.nodal_coordinates, h_tail_chord_surface.nodal_coordinates]
+    lattice_nodal_velocities = [wing_chord_surface.nodal_velocities]
+    # lattice_nodal_velocities = [wing_chord_surface.nodal_velocities, h_tail_chord_surface.nodal_velocities]
+    
 
     vlm_outputs = vlm_solver(
         lattice_coordinates, 
@@ -656,7 +711,7 @@ def define_vlm_analysis(caddee: cd.CADDEE):
 def run_beam(caddee: cd.CADDEE, vlm_output):
     base_config = caddee.base_configuration
     aircraft = base_config.system
-    wing : cd.aircraft.components.Wing = aircraft.comps["wing"]
+    wing = aircraft.comps["wing"] #changed this it might cause issues.
     # cruise : cd.aircraft.conditions.CruiseCondition = conditions["cruise"]
     # vlm_mesh = mesh_container["vlm_mesh"]
     # wing_lattice = vlm_mesh.discretizations["wing_chord_surface"]
@@ -667,7 +722,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
     wing_spanwise_vlm_forces = csdl.Variable(value=np.zeros((wing_spanwise_panels,3)))
     # this loop combines forces chordwise
     for i in csdl.frange(wing_chordwise_panels):
-        wing_spanwise_vlm_forces += vlm_outputs.surface_panel_forces[0][0][i]
+        wing_spanwise_vlm_forces += vlm_output.surface_panel_forces[0][0][i]
     # wing_spanwise_vlm_forces = np.sum(vlm_outputs.surface_panel_forces[0][0].value, axis=1)
 
     # 
@@ -677,7 +732,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
     else:
         middle_index = int((wing_chordwise_panels - 1)/2)
 
-    force_points = vlm_outputs.surface_panel_force_points[0][0][middle_index]
+    force_points = vlm_output.surface_panel_force_points[0][0][middle_index]
 
     num_nodes = force_points.shape[0]
     # beam_mesh = np.zeros((num_nodes, 3))
@@ -853,8 +908,8 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     rotor_meshes = mesh_container["rotor_meshes"]
     cruise_rotor_mesh = rotor_meshes.discretizations["cruise_prop_mesh"]
     mesh_vel = cruise_rotor_mesh.nodal_velocities
-    cruise_rpm = csdl.Variable(name="cruise_pusher_rpm", shape=(1, ), value=1200) #check this
-    cruise_rpm.set_as_design_variable(upper=2500, lower=1200, scaler=1/1200) #and this
+    cruise_rpm = csdl.Variable(name="cruise_pusher_rpm", shape=(1, ), value=14000)
+    cruise_rpm.set_as_design_variable(upper=14238, lower=1200, scaler=1/1200) #,
     bem_inputs = RotorAnalysisInputs(mesh_parameters = cruise_rotor_mesh, mesh_velocity = mesh_vel, rpm = cruise_rpm)
     bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
     bem_outputs = bem_model.evaluate(bem_inputs)
@@ -879,7 +934,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     accel_norm_cruise.name = "cruise_trim"
 
     #This is how the trim residual is set.
-    accel_norm_cruise.set_as_constraint(upper=1, lower=-1, scaler=1e-1)
+    accel_norm_cruise.set_as_constraint(upper=0.1, lower=-0.1, scaler=1e1)
 
     # Performing linearized stability analysis
     long_stability_results = cruise.perform_linear_stability_analysis(
@@ -950,7 +1005,7 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
     # Make CSDLAlphaProblem and initialize optimizer
     problem = CSDLAlphaProblem(problem_name="induced_drag_minimization", simulator=jax_sim)
     optimizer = SLSQP(problem=problem)
-
+    optimizer.default_solver_options["maxiter"] = 1000 #Woah
     # Solve optimization problem
     optimizer.solve()
     optimizer.print_results()
