@@ -486,8 +486,8 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
         wing.quantities.mass_properties.cg_vector = 0.56 * wing.LE_center + 0.44 * wing.TE_center # CG is around 44.4% of chord for 4412
     else:
         beam_radius_ft = beam_radius/units.length.foot_to_m
-        wing_weight = wing_mass_model(wing.parameters.AR,wing.parameters.S_ref,4,4,12,beam_radius)*units.mass.pound_to_kg
-        wing.quantities.mass_properties.mass = wing_weight
+        wing_mass = wing_mass_model(wing.parameters.AR,wing.parameters.S_ref,4,4,12,beam_radius_ft)*units.mass.pound_to_kg
+        wing.quantities.mass_properties.mass = wing_mass
         wing.quantities.mass_properties.cg_vector = 0.56 * wing.LE_center + 0.44 * wing.TE_center # CG is around 44.4% of chord for 4412
 
     wing_spars_mass = wing_spars_mass * 2
@@ -839,7 +839,7 @@ def wing_mass_model(AR,S,m,p,t,spar_outer_diameter):
             dyc = dyc.set(csdl.slice[i],((2*m)/p**2)*(p-(x[i]/c)))
         else:
             yc  = yc.set(csdl.slice[i],(c*m/(1-p)**2)*(1-2*p+2*p*(x[i]/c)-(x[i]/c)**2))
-            dyc = dyc.set(csdl.slice[i]((2*m)/(1-p)**2)*(p-(x[i]/c)))
+            dyc = dyc.set(csdl.slice[i],((2*m)/(1-p)**2)*(p-(x[i]/c)))
             c
     for i in csdl.frange(n):
         yt = yt.set(csdl.slice[i],(t*c)*(a0*csdl.sqrt(x[i]/c)+a1*(x[i]/c)+a2*(x[i]/c)**2+a3*(x[i]/c)**3+a4*(x[i]/c)**4))
@@ -873,12 +873,12 @@ def wing_mass_model(AR,S,m,p,t,spar_outer_diameter):
     return mass
 
 def csdlTrapIntegrator(x,y): #I have no idea if this works correctly
-    if len(x) != len(y):
+    if x.shape != y.shape:
         raise ValueError("X data and Y data must have same length")
     #integral = csdl.Variable(shape = (1,0) name = 'Area of Airfoil', value = 0)
     integral = 0
     integral = csdl.Variable(shape=(1,),name="Airfoil_Area",value = integral)
-    for i in csdl.frange(len(x) - 1):
+    for i in csdl.frange(x.shape[0] - 1):
         integral = integral + (x[i+1] - x[i]) * (y[i] + y[i+1]) / 2.0
     return integral
 
