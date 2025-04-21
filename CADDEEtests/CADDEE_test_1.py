@@ -459,9 +459,9 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     
     #Run beam analysis
     beam_radius, beam_ID_radius, wing_spars_mass = run_beam(caddee:=caddee, vlm_output=vlm_outputs)
-    # wing_spars_mass = csdl.Variable(value=0.15) #temp until run beam is working.
+    #wing_spars_mass = csdl.Variable(value=0.15) #temp until run beam is working.
 
-    seth_wing_volume = False
+    seth_wing_volume = True
     if seth_wing_volume:
         #wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=1/8) ########## Look into this
 
