@@ -159,8 +159,8 @@ def define_base_config(caddee : cd.CADDEE):
     wing_tip_twist = csdl.Variable(name="wing_tip_twist", value=0)
     
     # Set design variables for wing
-    aspect_ratio.set_as_design_variable(upper=1.2 * wing_AR, lower=0.8 * wing_AR, scaler=1/8)
-    wing_area.set_as_design_variable(upper=1.2 * wing_S, lower=0.8 * wing_S, scaler=1/16)
+    aspect_ratio.set_as_design_variable(upper=1.2 * wing_AR, lower=0.8 * wing_AR, scaler=1/6)
+    wing_area.set_as_design_variable(upper=1.2 * wing_S, lower=0.8 * wing_S, scaler=3.58)
     # wing_span.set_as_design_variable(upper=1.5 * span, lower = 0.8 * span, scaler=1/8)
     # wing_chord.set_as_design_variable(upper = 1.2 * wingchord, lower = 0.8 * wingchord, scaler = 1/16)
     wing_root_twist.set_as_design_variable(upper=np.deg2rad(15), lower=np.deg2rad(-15), scaler=4)
@@ -188,13 +188,18 @@ def define_base_config(caddee : cd.CADDEE):
     # !! setting root twist = tip twist, not as its own design variable
 
     # Set design variables for wing
-    h_stab_AR.set_as_design_variable(upper=1.5 * wing_AR, lower=0.8 * wing_AR, scaler=1/8)
+    h_stab_AR.set_as_design_variable(upper=1.5 * wing_AR, lower=0.8 * wing_AR, scaler=1/3)
     h_stab_root_twist.set_as_design_variable(upper=np.deg2rad(5), lower=np.deg2rad(-5), scaler=4)
     # h_stab_tip_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=2)
 
     # !! Why isn't area also a design variable?
     h_tail_area = csdl.Variable(name="h_tail_area", value=h_stab_S)
-    h_tail_area.set_as_design_variable(lower=0.5 * h_stab_S, upper=1.5 * h_stab_S, scaler=1/4)
+    #H_tail area default value is 
+    # h_stab_span = 1.25 * ft2m = 0.381
+    # h_stab_chord = 5/12 * ft2m = 0.127
+    # h_stab_AR = h_stab_span/h_stab_chord = 3
+    # h_stab_S = h_stab_span * h_stab_chord = 0.048387^-1 = 20.66667777
+    h_tail_area.set_as_design_variable(lower=0.5 * h_stab_S, upper=1.5 * h_stab_S, scaler=20.66667)
 
     # Make horizontal tail geometry & component
     h_tail_geometry = aircraft.create_subgeometry(search_names=["HStab"])
@@ -386,10 +391,11 @@ def define_base_config(caddee : cd.CADDEE):
     base_config.setup_geometry(plot=False)
 
     # tail moment arm
+    # I dont know if this is properly implemented or not
     wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
     h_tail_qc = 0.75 * h_tail.LE_center + 0.25 * h_tail.TE_center
     tail_moment_arm = csdl.norm(wing_qc - h_tail_qc)
-    print("tail moment arm", tail_moment_arm)
+    tail_moment_arm.set_as_design_variable(upper=10*units.length.foot_to_m, lower = 4*units.length.foot_to_m, scaler = 1/(10*units.length.foot_to_m))
           
     # Assign base configuration to CADDEE instance
     caddee.base_configuration = base_config
@@ -399,7 +405,7 @@ def define_conditions(caddee: cd.CADDEE):
     base_config = caddee.base_configuration
 
     pitch_angle = csdl.Variable(name="pitch_angle", value=0)
-    pitch_angle.set_as_design_variable(upper=np.deg2rad(20), lower=np.deg2rad(-20), scaler=4)
+    pitch_angle.set_as_design_variable(upper=np.deg2rad(20), lower=np.deg2rad(-20), scaler=1/0.34)
     cruise = cd.aircraft.conditions.CruiseCondition(
         altitude=0,
         range=100,
@@ -430,7 +436,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     battery_position = battery_position.set(csdl.slice[0],battery_x)
     battery.quantities.mass_properties.cg_vector = battery_position 
     # csdl.Variable(name="battery_cg", shape=(3,), value = np.array([battery_x, 0, 0]))
-    battery_x.set_as_design_variable(lower=5*cd.Units.length.inch_to_m, upper=10*cd.Units.length.inch_to_m, scaler=1)
+    battery_x.set_as_design_variable(lower=5*cd.Units.length.inch_to_m, upper=10*cd.Units.length.inch_to_m, scaler=1/0.254)
     battery_x.name = "Battery x postion"
     
     # battery_x.set_as_design_variable(lower=5*cd.Units.length.inch_to_m, upper=10*cd.Units.length.inch_to_m, scaler=1)
@@ -440,7 +446,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
     # these values need to be defined in terms of values passed into the wing component
     wing_span = csdl.sqrt(wing.parameters.AR * wing.parameters.S_ref)
-    wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=1/8) ########## Look into this
+    wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=1/1.8288) ########## Look into this
     # approximate the wing cross-section area as an ellipse, rectangle, and triangle.
     # TO DO: Replace this with CSDL integrator
     seth_wing_volume = True
@@ -685,10 +691,10 @@ def define_vlm_analysis(caddee: cd.CADDEE):
     wing_chord_surface = vlm_mesh.discretizations["wing_chord_surface"]
     h_tail_chord_surface = vlm_mesh.discretizations["h_tail_chord_surface"]
 
-    #lattice_coordinates = [wing_chord_surface.nodal_coordinates]
-    lattice_coordinates = [wing_chord_surface.nodal_coordinates, h_tail_chord_surface.nodal_coordinates]
-    #lattice_nodal_velocities = [wing_chord_surface.nodal_velocities]
-    lattice_nodal_velocities = [wing_chord_surface.nodal_velocities, h_tail_chord_surface.nodal_velocities]
+    lattice_coordinates = [wing_chord_surface.nodal_coordinates]
+    #lattice_coordinates = [wing_chord_surface.nodal_coordinates, h_tail_chord_surface.nodal_coordinates]
+    lattice_nodal_velocities = [wing_chord_surface.nodal_velocities]
+    #lattice_nodal_velocities = [wing_chord_surface.nodal_velocities, h_tail_chord_surface.nodal_velocities]
     
     vlm_outputs = vlm_solver(
         lattice_coordinates, 
@@ -744,7 +750,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
     loads = csdl.Variable(value=np.zeros((wing_spanwise_vlm_forces.shape[0], 6)))
 
     for j in range(3):
-        for i in range(loads[:,0].shape[0]):
+        for i in csdl.frange(loads[:,0].shape[0]):
             loads = loads.set(csdl.slice[i,j], wing_spanwise_vlm_forces[i,j])
 
     loads = 5 * loads / 2
@@ -756,7 +762,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
     # Density = mass/volume = 0.0693kg / 4.826E-5 m^3 = 1.435 kg/m^3 (very close to original value of 1420)
     carbon_fiber = af.Material(name='carbon_fiber', E=96.2E9/SF, G = 3.16E9/SF, density = 1435)
     beam_radius = csdl.Variable(value=0.1)
-    beam_radius.set_as_design_variable(lower=0.0015875, scaler=1E3) # needs to be larger than 1/8" for wiring purposes
+    beam_radius.set_as_design_variable(lower=0.0015875, scaler=1/0.0015875) # needs to be larger than 1/8" for wiring purposes
     beam_radius.name = "Beam Radius"
     beam_radius_expanded = csdl.expand(beam_radius, (num_nodes - 1,))
     # beam_1_thickness = csdl.Variable(value=np.ones(num_nodes_1 - 1) * 0.001)
@@ -781,8 +787,6 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
     r.set_as_constraint(lower=0)
 
     beam_def_mesh = beam_mesh + beam_displacement
-    # beam_displacement.set_as_constraint(lower=-displacement_limit,upper=displacement_limit,scaler=1e-4)
-    # cg = beam_1.cg
     mass = beam.mass
 
     beam_ID_radius = beam_radius - beam_thickness
@@ -902,7 +906,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     cruise_rotor_mesh = rotor_meshes.discretizations["cruise_prop_mesh"]
     mesh_vel = cruise_rotor_mesh.nodal_velocities
     cruise_rpm = csdl.Variable(name="cruise_pusher_rpm", shape=(1, ), value=14000)
-    cruise_rpm.set_as_design_variable(upper=14238, lower=1200, scaler=1/14238) #,
+    cruise_rpm.set_as_design_variable(upper=14238, lower=1200, scaler=1/1200)
     bem_inputs = RotorAnalysisInputs(mesh_parameters = cruise_rotor_mesh, mesh_velocity = mesh_vel, rpm = cruise_rpm)
     bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
     bem_outputs = bem_model.evaluate(bem_inputs)
