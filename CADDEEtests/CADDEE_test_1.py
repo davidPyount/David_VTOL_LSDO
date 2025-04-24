@@ -439,7 +439,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
     wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
     # these values need to be defined in terms of values passed into the wing component
     wing_span = csdl.sqrt(wing.parameters.AR * wing.parameters.S_ref)
-    wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=1/1.8288) ########## Look into this
+    wing_span.set_as_constraint(upper = 8 * cd.Units.length.foot_to_m, scaler=1/1.8288) ########## Look into this
     # approximate the wing cross-section area as an ellipse, rectangle, and triangle.
     # TO DO: Replace this with CSDL integrator
     seth_wing_volume = True
@@ -661,7 +661,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
 
     total_aircraft_mass = base_config.system.quantities.mass_properties.mass
     total_aircraft_mass.name = "total_aircraft_mass"
-    #total_aircraft_mass.set_as_constraint(upper=6*cd.Units.mass.pound_to_kg, scaler=1e-3) #This will probably fail optimization still.
+    total_aircraft_mass.set_as_constraint(upper=6*cd.Units.mass.pound_to_kg, scaler=1e-3) #This will probably fail optimization still.
 
     print(base_config.system.quantities.mass_properties.inertia_tensor.value)
 
@@ -981,7 +981,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     accel_norm_cruise.name = "cruise_trim"
 
     #This is how the trim residual is set.
-    accel_norm_cruise.set_as_constraint(upper=0.1, lower=-0.1, scaler=1e1)
+    accel_norm_cruise.set_as_constraint(upper=1, lower=-1, scaler=1)
 
     # Performing linearized stability analysis
     long_stability_results = cruise.perform_linear_stability_analysis(
@@ -1002,8 +1002,8 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     tail_factor = h_tail.parameters.S_ref/total_area
     #totalCOP = wing_factor*vlm_output.surface_cop[0][0][0] + tail_factor*vlm_output.surface_cop[0][0][0]
     # COP = vlm_output.surface_cop[0][0] #x componet
-    #static_margin = (COP-CG)/c
-    #static_margin.set_as_constraint(upper=0.15,lower=0.1,scaler=1e-1)
+    # static_margin = (COP-CG)/c
+    # static_margin.set_as_constraint(upper=0.15,lower=0.1,scaler=1e-1)
     
     # #Longitudinal dynamic stability THIS CAUSES ERROR
     # t2d = long_stability_results.time_2_double_phugoid
@@ -1021,7 +1021,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     R = csdl.Variable(value=10e3) #m
     cruise_time = R/cruise_veloicty #s
     energy = cruise.quantities.power * cruise_time #Ws
-    energy.set_as_constraint(lower=0,upper = 131868, scaler = 1/131868)
+    #energy.set_as_constraint(lower=0,upper = 131868, scaler = 1/131868)
     energy.name = ("Energy in Ws (J)")
     
     ER = energy/R
