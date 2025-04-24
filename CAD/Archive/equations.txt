@@ -18,4 +18,4 @@
 "vstab_span"= 6.5
 "hstab_span"= 15.25
 "tail_chord"= 5
-"wing_spar_ID"= 0.25
+"wing_spar_ID"= 0.25"main_spar_stickout" = 0.9

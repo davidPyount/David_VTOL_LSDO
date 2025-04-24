@@ -1,53 +1,30 @@
-"span"= 48
-
-"wing_chord"= 9
-
-"fuse_len"= 15
-
-"fuse_height"= 5
-
-"fuse_wid"= 5
-
-"foam_t"= 0.1875
-
-"main_spar_len"= 36
-
-"x_fuse_to_wing"= 3
-
-"x_cg_from_le"= 2.25
-
-"boom_len"= 30
-
-"wing_angle"= 1.5
-
-"boom_d"= 0.75
-
-"wing_spar_d"= 0.375
-
-"wing_spar_l"= 48
-
-"wing_spar_spacing"= 1.35
-
-"wing_mount_l"= 2.5
-
-"boom_mount_l"= 1
-
-"vstab_span"= 6.5
-
-"hstab_span"= 15.25
-
-"tail_chord"= 5
-
-"wing_spar_ID"= 0.25
-
-"fuse_inner_arc_length" = 0.5
-
-"fuse_inner_r" = "fuse_inner_arc_length" * 4 / (2*pi)
-
-"fuse_outer_r" = "fuse_inner_r" + "foam_t"
-
-"wing_mount_bolt_spacing" = "wing_mount_l" * 0.5
-
-"fuse_inner_h" = "fuse_height" - 2 * "foam_t"
-
-"fuse_inner_w" = "fuse_wid" - 2 * "fuse_outer_r"
+﻿"span"= 48
+"wing_chord"= 9
+"fuse_len"= 15
+"fuse_height"= 5
+"fuse_wid"= 5
+"foam_t"= 0.1875
+"main_spar_len"= 36
+"x_fuse_to_wing"= 3
+"x_cg_from_le"= 2.25
+"boom_len"= 30
+"wing_angle"= 1.5
+"boom_d"= 0.75
+"wing_spar_d"= 0.375
+"wing_spar_l"= 48
+"wing_spar_spacing"= 1.35
+"wing_mount_l"= 2.5
+"boom_mount_l"= 1
+"vstab_span"= 6.5
+"hstab_span"= 15.25
+"tail_chord"= 5
+"wing_spar_ID"= 0.25
+"fuse_inner_arc_length"= 0.5
+"fuse_inner_r"= "fuse_inner_arc_length" * 4 / (2*pi)
+"fuse_outer_r"= "fuse_inner_r" + "foam_t"
+"wing_mount_bolt_spacing"= "wing_mount_l" * 0.5
+"fuse_inner_h"= "fuse_height" - 2 * "foam_t"
+"fuse_inner_w"= "fuse_wid" - 2 * "fuse_outer_r"
+"wing_mount_y"= 36
+"tail_mount_l"= 4.67
+"tail_arm"= 25.5

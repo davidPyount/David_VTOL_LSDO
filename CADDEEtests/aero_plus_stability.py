@@ -84,8 +84,8 @@ h_battery = 0.033 # [m]
 density_foam = 24 # kg/m3
 
 # VLM nodes
-wing_spanwise_panels = 15
-wing_chordwise_panels = 13
+wing_spanwise_panels = 5
+wing_chordwise_panels = 3
 h_tail_spanwise_panels = 10
 h_tail_chordwise_panels = 5
 
@@ -391,7 +391,7 @@ def define_base_config(caddee : cd.CADDEE):
 
     # Set up the geometry: this will run the inner optimization
     # !! uncomment this to run inner optimization
-    base_config.setup_geometry(plot=False)
+    # base_config.setup_geometry(plot=True)
 
     # tail moment arm
     wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
@@ -427,21 +427,21 @@ def define_vlm_analysis(caddee: cd.CADDEE):
     mesh_container = cruise_config.mesh_container
     tail = cruise_config.system.comps["h_tail"]
 
-    elevator_deflection = csdl.Variable(name="elevator", value=0)
-    elevator_deflection.set_as_design_variable(lower=np.deg2rad(-10), upper=np.deg2rad(10), scaler=2)
-    tail.actuate(elevator_deflection)
+    # elevator_deflection = csdl.Variable(name="elevator", value=0)
+    # elevator_deflection.set_as_design_variable(lower=np.deg2rad(-10), upper=np.deg2rad(10), scaler=2)
+    # tail.actuate(elevator_deflection)
 
     # Re-evaluate meshes and compute nodal velocities
     cruise.finalize_meshes()
 
     vlm_mesh = mesh_container["vlm_mesh"]
     wing_chord_surface = vlm_mesh.discretizations["wing_chord_surface"]
-    # h_tail_chord_surface = vlm_mesh.discretizations["h_tail_chord_surface"]
+    h_tail_chord_surface = vlm_mesh.discretizations["h_tail_chord_surface"]
 
     lattice_coordinates = [wing_chord_surface.nodal_coordinates]
-    # lattice_coordinates = [wing_chord_surface.nodal_coordinates, h_tail_chord_surface.nodal_coordinates]
+    lattice_coordinates = [wing_chord_surface.nodal_coordinates, h_tail_chord_surface.nodal_coordinates]
     lattice_nodal_velocities = [wing_chord_surface.nodal_velocities]
-    # lattice_nodal_velocities = [wing_chord_surface.nodal_velocities, h_tail_chord_surface.nodal_velocities]
+    lattice_nodal_velocities = [wing_chord_surface.nodal_velocities, h_tail_chord_surface.nodal_velocities]
     
 
     vlm_outputs = vlm_solver(
@@ -871,10 +871,16 @@ def define_rotor_analysis(caddee: cd.CADDEE, vlm_outputs):
     thrust_moments_body = csdl.cross(thrust_origin, thrust_forces_body, axis=1)
 
     # Parasite drag build up
-    drag_build_up_model = cd.aircraft.models.aero.compute_drag_build_up
-    parasite_drag = drag_build_up_model(cruise.quantities.ac_states, cruise.quantities.atmos_states,
-                                        wing.parameters.S_ref, [wing, fuselage, tail, v_tail])
-    
+    # drag_build_up_model = cd.aircraft.models.aero.compute_drag_build_up
+    # parasite_drag = drag_build_up_model(cruise.quantities.ac_states, cruise.quantities.atmos_states,
+    #                                     wing.parameters.S_ref, [wing, fuselage, tail, v_tail])
+
+    Cd0 = 0.0429 
+    parasite_drag = 0.5 * cruise.quantities.atmos_states.density * cruise.parameters.speed**2 * wing.parameters.S_ref * Cd0
+    drag = csdl.Variable(name="drag", value=np.zeros((3)))
+    drag = drag.set(csdl.slice[0],parasite_drag)
+
+
     # Summing up the total forces and moments
     total_forces, total_moments = cruise.assemble_forces_and_moments(
         [vlm_forces, thrust_forces_body, parasite_drag], [vlm_moments, thrust_moments_body]
