@@ -302,7 +302,7 @@ def define_base_config(caddee : cd.CADDEE):
     base_config.connect_component_geometries(rl_boom, rl_prop, rl_boom.tail_point)
 
     # # main spar to fuselage
-    # base_config.connect_component_geometries(main_spar, fuselage, main_spar.nose_point)
+    base_config.connect_component_geometries(main_spar, fuselage, main_spar.nose_point)
 
     # wing booms to wing
     # base_config.connect_component_geometries(fr_boom, wing, fr_boom.tail_point)
@@ -371,13 +371,13 @@ def define_base_config(caddee : cd.CADDEE):
     #ROTOR MESHING FOR BEM
     num_radial = 5
     cruise_prop_geom = aircraft.create_subgeometry(search_names=["Main Propeller"]) #get geo from openvsp
-    cruise_prop = cd.aircraft.components.Rotor(radius=6, geometry=cruise_prop_geom, compute_surface_area=False, skip_ffd=True) #make CADDEE component
+    cruise_prop = cd.aircraft.components.Rotor(radius=4*units.length.inch_to_m, geometry=cruise_prop_geom, compute_surface_area=False, skip_ffd=True) #make CADDEE component
     cruise_prop_mesh = cd.mesh.make_rotor_mesh( #made bladeAD rotor mesh (not CADDEE mesh)
-        cruise_prop, num_radial=num_radial, num_azimuthal=1, num_blades=2
+        cruise_prop, num_radial=num_radial, num_azimuthal=5, num_blades=2
     )
     rotor_meshes = cd.mesh.RotorMeshes() #make caddee-compatible mesh holder
-    cruise_prop_mesh.twist_profile = csdl.Variable(shape=(num_radial, ), value=np.deg2rad(np.linspace(50., 20., num_radial))) #These are taken from other code, make them accurate for us.
-    cruise_prop_mesh.chord_profile = csdl.Variable(shape=(num_radial, ), value=np.linspace(0.24, 0.08, num_radial))
+    cruise_prop_mesh.twist_profile = csdl.Variable(shape=(num_radial, ), value=np.deg2rad(np.linspace(20, 50, num_radial))) 
+    cruise_prop_mesh.chord_profile = csdl.Variable(shape=(num_radial, ), value=np.linspace(1*units.length.inch_to_m, 0.2*units.length.inch_to_m, num_radial))
     rotor_meshes.discretizations["cruise_prop_mesh"] = cruise_prop_mesh #Assign bladeAD rotor mesh to caddee rotor mesh container
 
     #Connect cruise prop
@@ -390,13 +390,6 @@ def define_base_config(caddee : cd.CADDEE):
     # Set up the geometry: this will run the inner optimization
     base_config.setup_geometry(plot=False)
 
-    # tail moment arm
-    # I dont know if this is properly implemented or not
-    wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
-    h_tail_qc = 0.75 * h_tail.LE_center + 0.25 * h_tail.TE_center
-    tail_moment_arm = csdl.norm(wing_qc - h_tail_qc)
-    tail_moment_arm.set_as_design_variable(upper=10*units.length.foot_to_m, lower = 4*units.length.foot_to_m, scaler = 1/(10*units.length.foot_to_m))
-          
     # Assign base configuration to CADDEE instance
     caddee.base_configuration = base_config
 
@@ -885,32 +878,89 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     vlm_forces = vlm_output.total_force
     vlm_moments = vlm_output.total_moment
 
-    ###################################### BEM STUFF, not using qst (quasi-steady transition)
-    # Drag build-up
-    #drag_build_up_model = cd.aircraft.models.aero.compute_drag_build_up
-
     wing = aircraft.comps["wing"]
     fuselage = aircraft.comps["fuselage"]
     h_tail = aircraft.comps["h_tail"]
     v_tail = aircraft.comps['v_tail']
     # booms = [aircraft.comps["boom_FR"], aircraft.comps["boom_FL"], aircraft.comps["boom_BR"], aircraft.comps["boom_BL"]]
-
-    #This fails for weird reasons having to do with none values for certain drag parameters.
-    # drag_build_up = drag_build_up_model(cruise.quantities.ac_states, cruise.quantities.atmos_states,
-    #                                     wing.parameters.S_ref, [wing, fuselage, h_tail, v_tail])
     
-    cruise_power = {}
 
-    # BEM solver
-    rotor_meshes = mesh_container["rotor_meshes"]
-    cruise_rotor_mesh = rotor_meshes.discretizations["cruise_prop_mesh"]
-    mesh_vel = cruise_rotor_mesh.nodal_velocities
-    cruise_rpm = csdl.Variable(name="cruise_pusher_rpm", shape=(1, ), value=14000)
-    cruise_rpm.set_as_design_variable(upper=14238, lower=1200, scaler=1/1200)
-    bem_inputs = RotorAnalysisInputs(mesh_parameters = cruise_rotor_mesh, mesh_velocity = mesh_vel, rpm = cruise_rpm)
-    bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
-    bem_outputs = bem_model.evaluate(bem_inputs)
+    # # BEM solver
+    # rotor_meshes = mesh_container["rotor_meshes"]
+    # cruise_rotor_mesh = rotor_meshes.discretizations["cruise_prop_mesh"]
+    
+    # #mesh_vel = cruise_rotor_mesh.nodal_velocities
+    # mesh_vel_np = np.zeros((1, 3))
+    # mesh_vel_np[:, 0] = 0# Free stream velocity in the x-direction
+    # mesh_vel = csdl.Variable(value=mesh_vel_np)
+
+    # cruise_rpm = csdl.Variable(name="cruise_pusher_rpm", shape=(1, ), value=14000)
+    # cruise_rpm.set_as_design_variable(upper=14238, lower=1200, scaler=1/1200)
+    # bem_inputs = RotorAnalysisInputs(mesh_parameters = cruise_rotor_mesh, mesh_velocity = mesh_vel, rpm = cruise_rpm)
+
+    # Discretization
+    num_nodes = 1 # Number of evaluation points
+    num_radial = 35 # Number of radial sections
+    num_azimuthal = 1 # Number of azimuthal sections (can be 1 for axisymmetric flow)
+
+    num_blades = 2
+
+    # Simple 1D airfoil model
+    # Specify polar parameters
+
+    # Create airfoil model
+    airfoil_model = NACA4412MLAirfoilModel()
+
+    # Set up rotor analysis inputs
+    # 1) thrust vector and origin (origin is the rotor hub location and only needed for computing moments)
+    thrust_vector=csdl.Variable(name="thrust_vector", value=np.array([1, 0, 0])) # Thrust vector in the x-direction
+    thrust_origin=csdl.Variable(name="thrust_origin", value=np.array([0. ,0., 0.]))
+
+    # 2) Rotor geometry 
+    # chord and twist profiles (linearly varying from root to tip)
+    chord_profile=csdl.Variable(name="chord_profile", value=np.linspace(0.025, 0.005, num_radial))
+    twist_profile=csdl.Variable(name="twist_profile", value=np.linspace(np.deg2rad(50), np.deg2rad(20), num_radial)) # Twist in RADIANS
+    # Radius of the rotor
+    radius = csdl.Variable(name="radius", value=8/2*units.length.inch_to_m)
+
+    # 3) Mesh velocity: vector of shape (num_nodes, 3) where each row is the 
+    # free streamvelocity vector (u, v, w) at the rotor center
+    mesh_vel_np = np.zeros((num_nodes, 3))
+    mesh_vel_np[:, 0] = 21 # Free stream velocity in the x-direction in m/s (cruise velocity)
+    mesh_velocity = csdl.Variable(value=mesh_vel_np)
+    # Rotor speed in RPM
+    rpm = csdl.Variable(value=14000 * np.ones((num_nodes,)))
+    rpm.set_as_design_variable(upper=14328,lower=999,scaler=1/14000)
+
+    # 4) Assemble inputs
+    # mesh parameters
+    bem_mesh_parameters = RotorMeshParameters(
+        thrust_vector=thrust_vector,
+        thrust_origin=thrust_origin,
+        chord_profile=chord_profile,
+        twist_profile=twist_profile, 
+        radius=radius,
+        num_radial=num_radial,
+        num_azimuthal=num_azimuthal,
+        num_blades=num_blades,
+        norm_hub_radius=0.2,
+    )
+    # rotor analysis inputs
+    inputs = RotorAnalysisInputs(
+        rpm=rpm,
+        mesh_parameters=bem_mesh_parameters,
+        mesh_velocity=mesh_velocity,
+    )
+    # Instantiate and run BEM model
+    bem_model = BEMModel(
+        num_nodes=num_nodes,
+        airfoil_model=airfoil_model,
+        integration_scheme='trapezoidal',
+    )
+    bem_outputs = bem_model.evaluate(inputs=inputs)
+
     cruise_power = bem_outputs.total_power
+    thrust = bem_outputs.total_thrust
     cruise.quantities.power = cruise_power
     cruise_power.name = "Cruise Power [W]"
 
@@ -943,12 +993,17 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
 
     #Static Margin
     #assume neautral point at c/4 OR find the aerodynamic center and use that.
-    CG = aircraft.quantities.mass_properties.cg_vector[0]
+    CG = aircraft.quantities.mass_properties.cg_vector[0] #x componet
     b = csdl.sqrt(wing.parameters.AR*wing.parameters.S_ref) #ft #This should be a csdl variable at this point, check that.
     c = b/wing.parameters.AR #ft #This should be a csdl variable at this point, check that.
-    NP = c/4
-    static_margin = (NP-CG)/c
-    static_margin.set_as_constraint(upper=0.15,lower=0.1,scaler=1e-1)
+    
+    total_area = wing.parameters.S_ref + h_tail.parameters.S_ref
+    wing_factor = wing.parameters.S_ref/total_area
+    tail_factor = h_tail.parameters.S_ref/total_area
+    #totalCOP = wing_factor*vlm_output.surface_cop[0][0][0] + tail_factor*vlm_output.surface_cop[0][0][0]
+    # COP = vlm_output.surface_cop[0][0] #x componet
+    #static_margin = (COP-CG)/c
+    #static_margin.set_as_constraint(upper=0.15,lower=0.1,scaler=1e-1)
     
     # #Longitudinal dynamic stability THIS CAUSES ERROR
     # t2d = long_stability_results.time_2_double_phugoid
@@ -972,14 +1027,8 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     ER = energy/R
     ER.name = "E/R"
 
-    #Davids wing weight model testing stuff
-    # aircraft = caddee.base_configuration.system
-    # wing = aircraft.comps["wing"]
-    #weight = wing_weight_model(wing.parameters.AR,wing.parameters.S_ref,csdl.Variable(value=4),csdl.Variable(value=4),csdl.Variable(value=12),csdl.Variable(value=0.2))
-    #print(f"The calculated wing weight is {weight}")
-
     #SET AS OBJECTIVE
-    ER.set_as_objective()
+    ER.set_as_objective(scaler=1/21)
     #cruise.quantities.power.set_as_objective()
     #Equivalent bc cruise speed is fixed
 
@@ -1014,7 +1063,7 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
 
     # Make CSDLAlphaProblem and initialize optimizer
     
-    problem = CSDLAlphaProblem(problem_name="induced_drag_minimization", simulator=jax_sim)
+    problem = CSDLAlphaProblem(problem_name="E/R Minimization", simulator=jax_sim)
     optimizer = SLSQP(problem, solver_options={'maxiter': 3000, 'ftol': 1E-6}, turn_off_outputs=True)
     #optimizer = SLSQP(problem=problem)
     # Solve optimization problem
