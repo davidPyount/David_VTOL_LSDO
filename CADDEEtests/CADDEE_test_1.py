@@ -140,10 +140,10 @@ mach =cruise_v/sos
 density_foam = 36 # kg/m^3 according to updated weight from Madison
 
 # VLM nodes
-wing_spanwise_panels = 5
-wing_chordwise_panels = 3
-h_tail_spanwise_panels = 3
-h_tail_chordwise_panels = 3
+wing_spanwise_panels = 15
+wing_chordwise_panels = 13
+h_tail_spanwise_panels = 7
+h_tail_chordwise_panels = 7
 
 if wing_spanwise_panels % 2 == 0:
     raise ValueError('sowwy! wing_spanwise_panels must be odd until beam mesh is decoupled from VLM mesh 3:')
@@ -427,7 +427,7 @@ def define_base_config(caddee : cd.CADDEE):
 
     # Set up the geometry: this will run the inner optimization
     # !! uncomment this during real run, comment out to check initial setup
-    base_config.setup_geometry(plot=False)
+    # base_config.setup_geometry(plot=False)
           
     # Assign base configuration to CADDEE instance
     caddee.base_configuration = base_config
@@ -471,7 +471,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     battery_position = csdl.Variable(name="battery_position", value=np.zeros((3)))
     battery_position = battery_position.set(csdl.slice[0],battery_x)
     battery.quantities.mass_properties.cg_vector = battery_position 
-    battery_x.set_as_design_variable(lower=5*cd.Units.length.inch_to_m, upper=10*cd.Units.length.inch_to_m, scaler=5)
+    battery_x.set_as_design_variable(lower=-10*cd.Units.length.inch_to_m, upper=-5*cd.Units.length.inch_to_m, scaler=5)
 
     wing : cd.aircraft.components.Wing = aircraft.comps["wing"]
     wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
@@ -1008,7 +1008,16 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     accel_norm_cruise.name = "cruise_trim"
 
     #This is how the trim residual is set.
-    accel_norm_cruise.set_as_constraint(upper=0.1, lower=-0.1, scaler=10)
+    # accel_norm_cruise.set_as_constraint(upper=0.1, lower=-0.1, scaler=10)
+        # Setting force equilibrium constraints
+    force_norm = csdl.norm(total_forces_cruise)
+    moment_norm = csdl.norm(total_moments_cruise)
+
+    force_norm.name = "total_forces_norm"
+    moment_norm.name = "total_moments_norm"
+
+    force_norm.set_as_constraint(equals=0, scaler=1e-4)
+    moment_norm.set_as_constraint(equals=0., scaler=1e-4)
 
     # Performing linearized stability analysis
     long_stability_results = cruise.perform_linear_stability_analysis(
@@ -1022,15 +1031,15 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     #assume neutral point at c/4 OR find the aerodynamic center and use that.
     CG = aircraft.quantities.mass_properties.cg_vector[0]
 
-    wing_cop = vlm_output.surface_cop[0][0][0]
-    h_stab_cop = vlm_output.surface_cop[1][0][0]
-    total_area = wing.parameters.S_ref + h_tail.parameters.S_ref
-    total_cop = wing_cop * wing.parameters.S_ref / total_area + h_stab_cop * h_tail.parameters.S_ref / total_area
-    b = csdl.sqrt(wing.parameters.AR*wing.parameters.S_ref) #ft #This should be a csdl variable at this point, check that.
-    c = b/wing.parameters.AR #ft #This should be a csdl variable at this point, check that.
-    # NP = c/4
-    static_margin = (total_cop-CG)/c
-    static_margin.set_as_constraint(upper=0.18,lower=0.2,scaler=5)
+    # wing_cop = vlm_output.surface_cop[0][0][0]
+    # h_stab_cop = vlm_output.surface_cop[1][0][0]
+    # total_area = wing.parameters.S_ref + h_tail.parameters.S_ref
+    # total_cop = wing_cop * wing.parameters.S_ref / total_area + h_stab_cop * h_tail.parameters.S_ref / total_area
+    # b = csdl.sqrt(wing.parameters.AR*wing.parameters.S_ref) #ft #This should be a csdl variable at this point, check that.
+    # c = b/wing.parameters.AR #ft #This should be a csdl variable at this point, check that.
+    # # NP = c/4
+    # static_margin = (total_cop-CG)/c
+    # static_margin.set_as_constraint(upper=0.18,lower=0.2,scaler=5)
     
     # #Longitudinal dynamic stability THIS CAUSES ERROR
     # t2d = long_stability_results.time_2_double_phugoid
