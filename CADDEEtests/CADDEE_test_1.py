@@ -90,7 +90,7 @@ wing_boom_z = -0.038
 # cruise propulsion (rotor and motor)
 cruise_prop_d = 8 * units.length.inch_to_m
 cruise_motor_mass_val = 0.072 # [kg]
-cruise_motor_CG = np.array([-0.165, 0, 0]) # [m]
+cruise_motor_CG = np.array([0.0165, 0, 0]) # [m]
 
 # main spar
 main_spar_len = 34 * units.length.inch_to_m
@@ -110,7 +110,7 @@ m_battery = 0.372 # [kg]
 l_battery = 0.140 # [m]
 w_battery = 0.044 # [m]
 h_battery = 0.033 # [m]
-battery_x_val = -0.185 # [m]
+battery_x_val = -0.1859 # [m]
 
 # skeleton
 skeleton_mass_val = 0.689
@@ -183,7 +183,7 @@ def define_base_config(caddee : cd.CADDEE):
     main_spar_geometry = aircraft.create_subgeometry(search_names=["MainSpar"])
     # !! Adding main spar length as a design variable
     main_spar_length = csdl.Variable(name="main_spar_length", value=main_spar_len)
-    main_spar_length.set_as_design_variable(lower=0.5*main_spar_len, upper=main_spar_len, scaler=1)
+    main_spar_length.set_as_design_variable(lower=0.75*main_spar_len, upper=1.25*main_spar_len, scaler=1)
     main_spar = cd.aircraft.components.Fuselage(
         length=main_spar_length, 
         max_height= 0.75 * units.length.inch_to_m,
@@ -427,7 +427,7 @@ def define_base_config(caddee : cd.CADDEE):
 
     # Set up the geometry: this will run the inner optimization
     # !! uncomment this during real run, comment out to check initial setup
-    # base_config.setup_geometry(plot=False)
+    base_config.setup_geometry(plot=False)
           
     # Assign base configuration to CADDEE instance
     caddee.base_configuration = base_config
