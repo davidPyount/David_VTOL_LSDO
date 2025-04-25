@@ -28,4 +28,4 @@
 "wing_mount_y"= 36
 "tail_mount_l"= 4.67
 "tail_arm"= 25.5
-"main_spar_stickout"= 0.9
+"main_spar_stickout"= 0.9"wing_tc" = 0.12"wing_max_t" = "wing_chord" * "wing_tc"
