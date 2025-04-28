@@ -433,7 +433,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     battery_position = csdl.Variable(name="battery_position", value=np.zeros(3))
     battery_position = battery_position.set(csdl.slice[0],battery_x)
     battery.quantities.mass_properties.cg_vector = battery_position 
-    battery_x.set_as_design_variable(lower=-15*cd.Units.length.inch_to_m, upper=-5*cd.Units.length.inch_to_m, scaler=5)
+    battery_x.set_as_design_variable(lower=-15*cd.Units.length.inch_to_m, upper=-5*cd.Units.length.inch_to_m, scaler=5*cd.Units.length.inch_to_m)
 
     wing : cd.aircraft.components.Wing = aircraft.comps["wing"]
     wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
@@ -752,88 +752,6 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
     beam_ID_radius = beam_radius - beam_thickness
 
     return beam_radius, beam_ID_radius
-
-def wing_mass_model(AR,S,m,p,t,spar_outer_diameter):
-    #All inputs need to be CSDL variables!
-    b = csdl.sqrt(AR*S) #ft #This should be a csdl variable at this point, check that.
-    c = b/AR #ft #This should be a csdl variable at this point, check that.
-
-    m_adjusted = 0.01*m  # maximum camber in % of chord # These should be CSDL variables as well
-    p_adjusted = 0.10*p  # maximum camber position in tenths of chord
-    t_adjusted = 0.01*t  # thickness in % of chord
-
-    # Coefficients for 4 digit series
-    a0 =  csdl.Variable(value=1.4845)
-    a1 = csdl.Variable(value=-0.6300)
-    a2 = csdl.Variable(value=-1.7580)
-    a3 =  csdl.Variable(value=1.4215)
-    a4 = csdl.Variable(value=-0.5075)
-
-    n = 8 # number of points along the chord
-    x_vals = np.linspace(0,c.value,n) # x coordinate of points along the chord
-    x = csdl.Variable(value=x_vals,name="Wing_Weight_Model_X_Values")
-    yc_vals  = np.zeros(n) # y coordinate of the camber line
-    yc = csdl.Variable(shape =(n,),value=yc_vals,name="Wing_Weight_Model_YC_Values")
-    dyc_vals = np.zeros(n) # gradient of the camber line
-    dyc = csdl.Variable(shape =(n,),value=dyc_vals,name="Wing_Weight_Model_DYC_Values")
-    yt_vals  = np.zeros(n) # thickness distribution
-    yt = csdl.Variable(shape =(n,),value=yt_vals,name="Wing_Weight_Model_YT_Values")
-    xu_vals  = np.zeros(n) # x coordinate of the upper surface
-    xu = csdl.Variable(shape =(n,),value=xu_vals,name="Wing_Weight_Model_XU_Values")
-    yu_vals  = np.zeros(n) # y coordinate of the upper surface
-    yu = csdl.Variable(shape =(n,),value=yu_vals,name="Wing_Weight_Model_YU_Values")
-    xl_vals  = np.zeros(n) # x coordinate of the lower surface
-    xl = csdl.Variable(shape =(n,),value=xl_vals,name="Wing_Weight_Model_XL_Values")
-    yl_vals  = np.zeros(n) # y coordinate of the lower surface
-    yl = csdl.Variable(shape =(n,),value=yl_vals,name="Wing_Weight_Model_YL_Values")
-    for i in csdl.frange(n):
-        if  (x[i].value/c.value < p):
-            yc  = yc.set(csdl.slice[i],(c*m/p**2)*(2*p*(x[i]/c)-(x[i]/c)**2))
-            dyc = dyc.set(csdl.slice[i],((2*m)/p**2)*(p-(x[i]/c)))
-        else:
-            yc  = yc.set(csdl.slice[i],(c*m/(1-p)**2)*(1-2*p+2*p*(x[i]/c)-(x[i]/c)**2))
-            dyc = dyc.set(csdl.slice[i],((2*m)/(1-p)**2)*(p-(x[i]/c)))
-    for i in csdl.frange(n):
-        yt = yt.set(csdl.slice[i],(t*c)*(a0*csdl.sqrt(x[i]/c)+a1*(x[i]/c)+a2*(x[i]/c)**2+a3*(x[i]/c)**3+a4*(x[i]/c)**4))
-        teta  = csdl.arctan(dyc[i])
-        xu = xu.set(csdl.slice[i],x[i]  - yt[i]*csdl.sin(teta))
-        xl = xl.set(csdl.slice[i],x[i]  + yt[i]*csdl.sin(teta))
-        yu = yu.set(csdl.slice[i],yc[i]  + yt[i]*csdl.cos(teta))
-        yl = yl.set(csdl.slice[i],yc[i]  - yt[i]*csdl.cos(teta))
-
-    # plot.xlim(-0.2,c+0.2)
-    # plot.ylim(-c/3,c/3)
-    # plot.plot(xu,yu,color='deepskyblue')   
-    # plot.plot(xl,yl,color='deepskyblue')
-    # plot.plot(x,yc,'g--') 
-
-    # upper = np.trapz(yu,xu)
-    # lower = np.trapz(yl,xl)
-    upper = csdlTrapIntegrator(xu,yu)
-    lower = csdlTrapIntegrator(xl,yl)
-
-    # upperNP = np.trapz(yu,xu)
-    # lowerNP = n.trapz(yl,xl)
-
-    total_area = upper + -(lower)
-
-    foam_density = csdl.Variable(value=1.5) #lb/ft**3 #This is an aproximation to get the code working
-    volume_wing = total_area * b
-    volume_spars = 2*np.pi*(spar_outer_diameter/2/12)**2*b #Volume of both spars in ft^3, spar outer diamter in in^3
-    volume_total = volume_wing-volume_spars
-    mass = volume_total*foam_density
-    return mass
-
-def csdlTrapIntegrator(x,y):
-    if x.shape != y.shape:
-        raise ValueError("X data and Y data must have same length")
-    #integral = csdl.Variable(shape = (1,0) name = 'Area of Airfoil', value = 0)
-    integral = 0
-    integral = csdl.Variable(shape=(1,),name="Airfoil_Area",value = integral)
-    for i in csdl.frange(x.shape[0] - 1):
-        integral = integral + (x[i+1] - x[i]) * (y[i] + y[i+1]) / 2.0
-    return integral
-
 
 def define_analysis(caddee: cd.CADDEE, vlm_output):
     conditions = caddee.conditions
