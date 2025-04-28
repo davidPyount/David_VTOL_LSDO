@@ -11,12 +11,12 @@
         <CORZ Value="0.000000000000000000e+00" ID="IRDDZQRHYLX"/>
         <PanX Value="-7.892366051673889160e-01" ID="SRVOYYQYSCF"/>
         <PanY Value="9.244924783706665039e-02" ID="SJXMFTPCJFZ"/>
-        <RotationX Value="7.350262313041783102e+01" ID="MYPXQZLONHP"/>
-        <RotationY Value="-5.394403151753323300e+01" ID="FKKAEEMPNRM"/>
-        <RotationZ Value="-6.277876168063424700e+01" ID="VFBQJUXZTEN"/>
+        <RotationX Value="3.924526976327444316e+01" ID="MYPXQZLONHP"/>
+        <RotationY Value="-2.695502737075350197e+01" ID="FKKAEEMPNRM"/>
+        <RotationZ Value="-3.037972861682749937e+01" ID="VFBQJUXZTEN"/>
         <ViewportX Value="3.815000000000000000e+03" ID="RQDHPAJMYYD"/>
         <ViewportY Value="1.905000000000000000e+03" ID="SHHYBNAQMFD"/>
-        <Zoom Value="1.312707434408366680e-03" ID="RAISUHLEEYL"/>
+        <Zoom Value="1.770916511304676533e-03" ID="RAISUHLEEYL"/>
       </AdjustView>
       <AirfoilExport>
         <AFAppendGeomIDFlag Value="1.000000000000000000e+00" ID="BZGQKSJTFHJ"/>
@@ -396,7 +396,7 @@
           <X_Location Value="1.270000000000000018e-01" ID="ZTHMSGXJKKS"/>
           <X_Rel_Location Value="1.270000000000000018e-01" ID="OSCGFBFETAW"/>
           <X_Rel_Rotation Value="0.000000000000000000e+00" ID="YCXEYOEXTJH"/>
-          <X_Rotation Value="0.000000000000000000e+00" ID="OSZMKJUAGGB"/>
+          <X_Rotation Value="-0.000000000000000000e+00" ID="OSZMKJUAGGB"/>
           <Y_Location Value="0.000000000000000000e+00" ID="ZTKVEOVJFHC"/>
           <Y_Rel_Location Value="0.000000000000000000e+00" ID="XJWEJKMFTQI"/>
           <Y_Rel_Rotation Value="0.000000000000000000e+00" ID="LVGOWNQZOTZ"/>
@@ -882,7 +882,7 @@
           <X_Location Value="1.015999999999999959e-01" ID="XHSOEJBONEF"/>
           <X_Rel_Location Value="1.015999999999999959e-01" ID="AVPTUWKKUII"/>
           <X_Rel_Rotation Value="0.000000000000000000e+00" ID="MZNOIYMRHVY"/>
-          <X_Rotation Value="0.000000000000000000e+00" ID="QKUFIWRXCLI"/>
+          <X_Rotation Value="-0.000000000000000000e+00" ID="QKUFIWRXCLI"/>
           <Y_Location Value="0.000000000000000000e+00" ID="BMQTOYYAZJE"/>
           <Y_Rel_Location Value="0.000000000000000000e+00" ID="BFMQXLHVMAU"/>
           <Y_Rel_Rotation Value="0.000000000000000000e+00" ID="LHQWRBPTIPK"/>
@@ -1351,7 +1351,7 @@
           <X_Location Value="-4.000000000000114575e-04" ID="ACWWHFGMRWX"/>
           <X_Rel_Location Value="-4.000000000000114575e-04" ID="LPKFPPDVPIS"/>
           <X_Rel_Rotation Value="0.000000000000000000e+00" ID="BJGLDYSGFEP"/>
-          <X_Rotation Value="0.000000000000000000e+00" ID="JNHKQZRMDMQ"/>
+          <X_Rotation Value="-0.000000000000000000e+00" ID="JNHKQZRMDMQ"/>
           <Y_Location Value="0.000000000000000000e+00" ID="HQCTDTJSODQ"/>
           <Y_Rel_Location Value="0.000000000000000000e+00" ID="QZDMOEUOXMV"/>
           <Y_Rel_Rotation Value="0.000000000000000000e+00" ID="VBHYHHJJQJX"/>
@@ -1835,7 +1835,7 @@
           <X_Location Value="2.031999999999999917e-01" ID="APUYNAPWCNB"/>
           <X_Rel_Location Value="2.031999999999999917e-01" ID="TZVOYWZFPPV"/>
           <X_Rel_Rotation Value="0.000000000000000000e+00" ID="RPDUSHMBRSF"/>
-          <X_Rotation Value="0.000000000000000000e+00" ID="XMGNIRQZVAY"/>
+          <X_Rotation Value="-0.000000000000000000e+00" ID="XMGNIRQZVAY"/>
           <Y_Location Value="0.000000000000000000e+00" ID="UUBRWVDMPQL"/>
           <Y_Rel_Location Value="0.000000000000000000e+00" ID="IJFCPFXSYLE"/>
           <Y_Rel_Rotation Value="1.500000000000000000e+00" ID="SAWHDZVACGX"/>
@@ -2599,7 +2599,7 @@
           <X_Location Value="8.508999999999999897e-01" ID="TKHFGXADHHZ"/>
           <X_Rel_Location Value="8.508999999999999897e-01" ID="VARTAIGOLLX"/>
           <X_Rel_Rotation Value="0.000000000000000000e+00" ID="UNRKNNJDMWG"/>
-          <X_Rotation Value="0.000000000000000000e+00" ID="ZCKHXXKVRFX"/>
+          <X_Rotation Value="-0.000000000000000000e+00" ID="ZCKHXXKVRFX"/>
           <Y_Location Value="0.000000000000000000e+00" ID="FQNKVCALYEC"/>
           <Y_Rel_Location Value="0.000000000000000000e+00" ID="NQMQWQXJBDV"/>
           <Y_Rel_Rotation Value="-1.500000000000000000e+00" ID="CWDKECHDAPT"/>
@@ -6833,7 +6833,7 @@
           <X_Location Value="-2.540000000000000591e-02" ID="KFXNUSIMOKK"/>
           <X_Rel_Location Value="-2.540000000000000591e-02" ID="NJWOLQSPDUB"/>
           <X_Rel_Rotation Value="0.000000000000000000e+00" ID="VUOGOEMMGUC"/>
-          <X_Rotation Value="0.000000000000000000e+00" ID="OCJQWOYPMXG"/>
+          <X_Rotation Value="-0.000000000000000000e+00" ID="OCJQWOYPMXG"/>
           <Y_Location Value="0.000000000000000000e+00" ID="XSRSIDYBUJE"/>
           <Y_Rel_Location Value="0.000000000000000000e+00" ID="PFGWZQFREXM"/>
           <Y_Rel_Rotation Value="0.000000000000000000e+00" ID="VOEHGNTJRJS"/>
@@ -8406,7 +8406,7 @@
           <X_Location Value="2.610000000000000098e-01" ID="TYKCIZCGCHT"/>
           <X_Rel_Location Value="2.610000000000000098e-01" ID="HXBGKJABJCO"/>
           <X_Rel_Rotation Value="0.000000000000000000e+00" ID="XTKYTIRZGAC"/>
-          <X_Rotation Value="0.000000000000000000e+00" ID="GXDPVRVBAHI"/>
+          <X_Rotation Value="-0.000000000000000000e+00" ID="GXDPVRVBAHI"/>
           <Y_Location Value="4.572000000000000508e-01" ID="WCOLJROJWRD"/>
           <Y_Rel_Location Value="4.572000000000000508e-01" ID="YDZKKWHDEPD"/>
           <Y_Rel_Rotation Value="0.000000000000000000e+00" ID="GPLWCGPKGCY"/>
@@ -8875,7 +8875,7 @@
           <X_Location Value="2.605024000000000228e-01" ID="BPDSVCLOFDS"/>
           <X_Rel_Location Value="2.605024000000000228e-01" ID="UULODVVXKES"/>
           <X_Rel_Rotation Value="0.000000000000000000e+00" ID="IQYOKDCBLXY"/>
-          <X_Rotation Value="0.000000000000000000e+00" ID="OBCLYIZFDHC"/>
+          <X_Rotation Value="-0.000000000000000000e+00" ID="OBCLYIZFDHC"/>
           <Y_Location Value="-4.572000000000000508e-01" ID="JTLZBUWRPBT"/>
           <Y_Rel_Location Value="-4.572000000000000508e-01" ID="CDHYFWPEDGO"/>
           <Y_Rel_Rotation Value="0.000000000000000000e+00" ID="HBHRXPVKTHI"/>
@@ -12120,7 +12120,7 @@ void Scale(double curr_scale )
           <X_Location Value="1.158239999999999964e-01" ID="ZZNQVZLPOPV"/>
           <X_Rel_Location Value="1.158239999999999964e-01" ID="HMKINZUDMOD"/>
           <X_Rel_Rotation Value="0.000000000000000000e+00" ID="ODKHHGGHKUU"/>
-          <X_Rotation Value="0.000000000000000000e+00" ID="VYSQXKTQDMM"/>
+          <X_Rotation Value="-0.000000000000000000e+00" ID="VYSQXKTQDMM"/>
           <Y_Location Value="0.000000000000000000e+00" ID="EDBLWNHLPKA"/>
           <Y_Rel_Location Value="0.000000000000000000e+00" ID="ABELQGYVLSC"/>
           <Y_Rel_Rotation Value="0.000000000000000000e+00" ID="YOEIDEEGFVJ"/>
