@@ -1,7 +1,7 @@
 import CADDEE_alpha as cd
 import csdl_alpha as csdl
 import numpy as np
-from lsdo_airfoil.core.three_d_airfoil_aero_model import ThreeDAirfoilMLModelMaker
+#from lsdo_airfoil.core.three_d_airfoil_aero_model import ThreeDAirfoilMLModelMaker
 from VortexAD.core.vlm.vlm_solver import vlm_solver
 from modopt import CSDLAlphaProblem, SLSQP
 from CADDEE_alpha.utils.units import Units
@@ -10,11 +10,11 @@ import lsdo_function_spaces as lfs
 import aframe as af
 import os #for relative path import
 from BladeAD.core.airfoil.ml_airfoil_models.NACA_4412.naca_4412_model import NACA4412MLAirfoilModel
-from BladeAD.utils.parameterization import BsplineParameterization
+#from BladeAD.utils.parameterization import BsplineParameterization
 from BladeAD.core.BEM.bem_model import BEMModel
-from BladeAD.core.pitt_peters.pitt_peters_model import PittPetersModel
+#from BladeAD.core.pitt_peters.pitt_peters_model import PittPetersModel
 from BladeAD.utils.var_groups import RotorAnalysisInputs, RotorMeshParameters
-from CADDEE_alpha.core.mesh.meshers import CamberSurface
+#from CADDEE_alpha.core.mesh.meshers import CamberSurface
 units = Units()
 
 # Start the CSDL recorder
@@ -156,10 +156,10 @@ def define_base_config(caddee : cd.CADDEE):
     # Make aircraft component and pass in the geometry
     aircraft = cd.aircraft.components.Aircraft(geometry=mark2_geom, compute_surface_area=False)
 
-    # instantiation configuration object and pass in system component (aircraft)
+    # Instantiate configuration object and pass in system component (aircraft)
     base_config = cd.Configuration(system=aircraft)
 
-    # why isn't the fuselage component assigned to the aircraft?
+    # Fuselage
     fuselage_geometry = aircraft.create_subgeometry(search_names=["Fuselage"])
     fuselage = cd.aircraft.components.Fuselage(
     length=fuselage_length, 
@@ -182,19 +182,15 @@ def define_base_config(caddee : cd.CADDEE):
         geometry=main_spar_geometry,
         )
     main_spar.quantities.drag_parameters.characteristic_length = main_spar_length #Refer to above.
-    # assign main spar component to aircraft
+    # Assign main spar component to aircraft
     aircraft.comps["main_spar"] = main_spar
 
     # Make wing geometry from aircraft component and instantiate wing component
     # wing_geometry = aircraft.create_subgeometry(search_names=["Wing"])
     wing_geometry = aircraft.create_subgeometry(search_names=["Wing"], ignore_names=["34","35","24","25","28","29","30","31"])
-    # for fun_nama, fun in wing_geometry_2.functions.items():
-    #     print(fun_nama)
-    #     fun.plot()
 
     # wing_geometry_2.plot(opacity=0.5, color='#FFCD00')
 
-    # exit()
     aspect_ratio = csdl.Variable(name="wing_aspect_ratio", value = wing_AR)
     wing_area = csdl.Variable(name="wing_area", value = wing_S)
     wing_root_twist = csdl.Variable(name="wing_root_twist", value=np.deg2rad(1.5))
@@ -212,7 +208,6 @@ def define_base_config(caddee : cd.CADDEE):
         tip_twist_delta=wing_tip_twist, geometry=wing_geometry
     )
 
-    # wing.quantities.drag_parameters.characteristic_length = wing_chord
     # Assign wing component to aircraft
     aircraft.comps["wing"] = wing    
 
@@ -261,7 +256,7 @@ def define_base_config(caddee : cd.CADDEE):
     battery = cd.Component()
     aircraft.comps["battery"] = battery
 
-    #Wing spars?
+    #Wing spars
     wing_spars = cd.Component()
     aircraft.comps["wing_spars"] = wing_spars
 
@@ -301,7 +296,7 @@ def define_base_config(caddee : cd.CADDEE):
 
     # confirm that mesh is being generated properly. I changed a setting in meshers.py (lines 305, 634, 701))
 
-        # H-Tail 
+    # H-Tail 
     tail_chord_surface = cd.mesh.make_vlm_surface(
         wing_comp=h_tail,
         num_chordwise=h_tail_chordwise_panels, 
@@ -348,21 +343,6 @@ def define_base_config(caddee : cd.CADDEE):
     # Assign base configuration to CADDEE instance
     caddee.base_configuration = base_config
 
-    # I had to add these lines to fix the issue I was having with VLM solver (nodal coordinates had extra row of zeros)
-    # wing_nodes = csdl.expand(wing_camber_surface, (1, wing_chordwise_nodes, wing_spanwise_nodes, 3), 'ijk->aijk')
-    # h_tail_nodes = csdl.expand(h_tail_camber_surface, (1, tail_chordwise_nodes, tail_spanwise_nodes, 3), 'ijk->aijk')
-    # wing_camber_surface = csdl.expand(wing_camber_surface, (1, wing_chordwise_nodes, wing_spanwise_nodes, 3), 'ijk->aijk')
-    # h_tail_camber_surface = csdl.expand(h_tail_camber_surface, (1, tail_chordwise_nodes, tail_spanwise_nodes, 3), 'ijk->aijk')
-
-    # return wing_nodes, h_tail_nodes
-    # return wing_camber_surface, h_tail_camber_surface
-
-        # displacement
-    # displacement_space = fs.BSplineSpace(2, (1,1), (3,3))
-    # wing.quantities.displacement_space = wing_geometry.create_parallel_space(
-    #                                                 displacement_space)
-    # wing.quantities.oml_displacement_space = wing_oml.create_parallel_space(
-                                                    # displacement_space)
 
 def define_conditions(caddee: cd.CADDEE):
     conditions = caddee.conditions
@@ -386,13 +366,8 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     """Define the mass properties of the aircraft."""
     base_config = caddee.base_configuration
     aircraft = base_config.system
-
     conditions = caddee.conditions
     cruise : cd.aircraft.conditions.CruiseCondition = conditions["cruise"]
-    # dynamic_pressure = 0.5 * cruise.quantities.atmos_states.density * cruise.parameters.speed**2
-
-    # design_gross_weight = csdl.Variable(name="design_gross_weight", value=w_total)
-    fuel_weight = 0
     
     battery = aircraft.comps["battery"]
     battery_mass = csdl.Variable(name="battery_mass", value=m_battery)
@@ -410,7 +385,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     # these values need to be defined in terms of values passed into the wing component
     wing_span = csdl.sqrt(wing.parameters.AR * wing.parameters.S_ref)
     # wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=0.5) ########## Look into this
-    wing_span.set_as_constraint(upper = 7 * cd.Units.length.foot_to_m, scaler=0.5) ########## Look into this
+    wing_span.set_as_constraint(upper = 10 * cd.Units.length.foot_to_m, scaler=0.5)
 
     beam_radius, beam_ID_radius = run_beam(caddee=caddee, vlm_output=vlm_output)
 
@@ -424,33 +399,25 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     wing_spars.quantities.mass_properties.cg_vector = wing_qc
     
     # approximate the wing cross-section area as an ellipse, rectangle, and triangle.
-    # TO DO: Replace this with CSDL integrator
-    seth_wing_volume = True
-    if seth_wing_volume:
-        wing_chord = csdl.sqrt(wing.parameters.S_ref / wing.parameters.AR)
-        # wing_thickness_to_chord = 0.12 * wing_chord
+    wing_chord = csdl.sqrt(wing.parameters.S_ref / wing.parameters.AR)
+    # wing_thickness_to_chord = 0.12 * wing_chord
 
-        wing_max_t = wing_chord*wing_tc
-        wing_ellipse_a = 0.3*wing_chord
-        wing_ellipse_b = 1/2 * wing_max_t
-        wing_ellipse_area = np.pi * wing_ellipse_a * wing_ellipse_b / 2
+    wing_max_t = wing_chord*wing_tc
+    wing_ellipse_a = 0.3*wing_chord
+    wing_ellipse_b = 1/2 * wing_max_t
+    wing_ellipse_area = np.pi * wing_ellipse_a * wing_ellipse_b / 2
 
-        wing_rectangle_area = 0.2*wing_chord * wing_max_t
+    wing_rectangle_area = 0.2*wing_chord * wing_max_t
 
-        wing_triangle_area = 2 * (1/2 * wing_max_t/2 * wing_chord/2)
+    wing_triangle_area = 2 * (1/2 * wing_max_t/2 * wing_chord/2)
 
-        wing_cross_section_area = wing_ellipse_area + wing_rectangle_area + wing_triangle_area
+    wing_cross_section_area = wing_ellipse_area + wing_rectangle_area + wing_triangle_area
 
-        wing_volume = wing_cross_section_area * wing_span - 2*np.pi*(beam_radius**2)*wing_span
+    wing_volume = wing_cross_section_area * wing_span - 2*np.pi*(beam_radius**2)*wing_span
 
-        wing_mass = wing_volume * density_foam
-        wing.quantities.mass_properties.mass = wing_mass + fuel_weight
-        wing.quantities.mass_properties.cg_vector = 0.56 * wing.LE_center + 0.44 * wing.TE_center # CG is around 44.4% of chord for 4412
-    else:
-        beam_radius_ft = beam_radius/units.length.foot_to_m
-        wing_mass = wing_mass_model(wing.parameters.AR,wing.parameters.S_ref,4,4,12,beam_radius_ft)*units.mass.pound_to_kg
-        wing.quantities.mass_properties.mass = wing_mass
-        wing.quantities.mass_properties.cg_vector = 0.56 * wing.LE_center + 0.44 * wing.TE_center # CG is around 44.4% of chord for 4412
+    wing_mass = wing_volume * density_foam
+    wing.quantities.mass_properties.mass = wing_mass
+    wing.quantities.mass_properties.cg_vector = 0.56 * wing.LE_center + 0.44 * wing.TE_center # CG is around 44.4% of chord for 4412
 
 
     fuselage : cd.aircraft.components.Fuselage = aircraft.comps["fuselage"]
@@ -468,27 +435,25 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     # approximate the cross-sectional area of the h-stab as an ellipse, rectangle, and triangle
 
     h_tail = aircraft.comps["h_tail"]
-    if seth_wing_volume:
-        h_tail_span = csdl.sqrt(h_tail.parameters.AR * h_tail.parameters.S_ref)
-        h_tail_chord = csdl.sqrt(h_tail.parameters.S_ref / h_tail.parameters.AR)
-        # h_tail_thickness_to_chord = 0.12 * h_tail_chord
 
-        h_tail_max_t = h_tail_chord*h_stab_tc
-        h_tail_ellipse_a = 0.3*h_tail_chord
-        h_tail_ellipse_b = 1/2 * h_tail_max_t
-        h_tail_ellipse_area = np.pi * h_tail_ellipse_a * h_tail_ellipse_b / 2
+    h_tail_span = csdl.sqrt(h_tail.parameters.AR * h_tail.parameters.S_ref)
+    h_tail_chord = csdl.sqrt(h_tail.parameters.S_ref / h_tail.parameters.AR)
+    # h_tail_thickness_to_chord = 0.12 * h_tail_chord
 
-        h_tail_rectangle_area = 0.2*h_tail_chord * h_tail_max_t
+    h_tail_max_t = h_tail_chord*h_stab_tc
+    h_tail_ellipse_a = 0.3*h_tail_chord
+    h_tail_ellipse_b = 1/2 * h_tail_max_t
+    h_tail_ellipse_area = np.pi * h_tail_ellipse_a * h_tail_ellipse_b / 2
 
-        h_tail_triangle_area = 2 * (1/2 * h_tail_max_t/2 * 0.5*h_tail_chord)
+    h_tail_rectangle_area = 0.2*h_tail_chord * h_tail_max_t
 
-        h_tail_cross_section_area = h_tail_ellipse_area + h_tail_rectangle_area + h_tail_triangle_area 
+    h_tail_triangle_area = 2 * (1/2 * h_tail_max_t/2 * 0.5*h_tail_chord)
 
-        h_tail_volume = h_tail_cross_section_area * h_tail_span
-        
-        h_tail_mass = density_foam * h_tail_volume
-    else:
-        h_tail_mass = wing_mass_model(h_tail.parameters.AR,h_tail.parameters.S_ref,0,0,12,0)
+    h_tail_cross_section_area = h_tail_ellipse_area + h_tail_rectangle_area + h_tail_triangle_area 
+
+    h_tail_volume = h_tail_cross_section_area * h_tail_span
+    
+    h_tail_mass = density_foam * h_tail_volume
 
     h_tail.quantities.mass_properties.mass = h_tail_mass
     h_tail.quantities.mass_properties.cg_vector = 0.575 * h_tail.LE_center + 0.425 * h_tail.TE_center
@@ -602,16 +567,11 @@ def define_vlm_analysis(caddee: cd.CADDEE):
     cruise.finalize_meshes()
 
     vlm_mesh = mesh_container["vlm_mesh"]
-    # wing_camber_surface = vlm_mesh.discretizations["wing_camber_surface"]
     wing_chord_surface = vlm_mesh.discretizations["wing_chord_surface"]
-    # h_tail_camber_surface = vlm_mesh.discretizations["h_tail_camber_surface"]
     h_tail_chord_surface = vlm_mesh.discretizations["h_tail_chord_surface"]
 
     lattice_coordinates = [wing_chord_surface.nodal_coordinates, h_tail_chord_surface.nodal_coordinates]
-    # lattice_coordinates = [wing_camber_surface.nodal_coordinates, h_tail_camber_surface.nodal_coordinates]
-    # lattice_coordinates = [wing_nodes, h_tail_nodes]
     lattice_nodal_velocities = [wing_chord_surface.nodal_velocities, h_tail_chord_surface.nodal_velocities]
-    # lattice_nodal_velocities = [wing_camber_surface.nodal_velocities, h_tail_camber_surface.nodal_velocities]
     
     # top one is the glitchy one
     # mark2_geom.plot_meshes(meshes=[wing_camber_surface.nodal_coordinates.value, h_tail_camber_surface.nodal_coordinates.value])
@@ -648,10 +608,6 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
     # wing.geometry.plot_meshes(beam_disc.nodal_coordinates.value)
     beam_mesh.discretizations["wing_spar"] = beam_disc
     # mesh_container["beam_mesh"] = beam_mesh
-
-    # beam_mesh = mesh_container["beam_mesh"]
-    # wing_box = beam_mesh.discretizations["wing"]
-    # aluminum = wing.quantities.material_properties.material
 
     wing_spar = beam_mesh.discretizations["wing_spar"]
     wing_spar_nodes = wing_spar.nodal_coordinates
@@ -746,16 +702,8 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     drag_build_up_model = cd.aircraft.models.aero.compute_drag_build_up
 
     wing = aircraft.comps["wing"]
-    fuselage = aircraft.comps["fuselage"]
-    h_tail = aircraft.comps["h_tail"]
-    v_tail = aircraft.comps['v_tail']
-    # booms = [aircraft.comps["boom_FR"], aircraft.comps["boom_FL"], aircraft.comps["boom_BR"], aircraft.comps["boom_BL"]]
-
-    #This fails for weird reasons having to do with none values for certain drag parameters.
-    parasitic_drag_buildup = drag_build_up_model(cruise.quantities.ac_states, cruise.quantities.atmos_states,
-                                        wing.parameters.S_ref, [wing, fuselage, h_tail, v_tail])
     
-    # !! change here
+    # Parasitic drag buildup
     Cd0 = 0.0429 
     parasite_drag = -0.5 * cruise.quantities.atmos_states.density * cruise.parameters.speed**2 * wing.parameters.S_ref * Cd0
     drag = csdl.Variable(name="drag", value=np.zeros((1,3)))
@@ -763,28 +711,11 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
 
     cruise_power = {}
 
-    # BEM solver
-    # rotor_meshes = mesh_container["rotor_meshes"]
-    # cruise_rotor_mesh = rotor_meshes.discretizations["cruise_prop_mesh"]
-    # mesh_vel = cruise_rotor_mesh.nodal_velocities
-    # cruise_rpm = csdl.Variable(name="cruise_pusher_rpm", shape=(1, ), value=14000)
-    # cruise_rpm.set_as_design_variable(upper=14238, lower=1200, scaler=1/14238) #,
-    # bem_inputs = RotorAnalysisInputs(mesh_parameters = cruise_rotor_mesh, mesh_velocity = mesh_vel, rpm = cruise_rpm)
-    # bem_model = BEMModel(num_nodes=1, airfoil_model=NACA4412MLAirfoilModel())
-    # bem_outputs = bem_model.evaluate(bem_inputs)
-    # cruise_power = bem_outputs.total_power
-    # cruise.quantities.power = cruise_power
-    # cruise_power.name = "Cruise Power [W]"
-
     # Discretization
     num_nodes = 1 # Number of evaluation points
     num_radial = 35 # Number of radial sections
     num_azimuthal = 1 # Number of azimuthal sections (can be 1 for axisymmetric flow)
-
     num_blades = 2
-
-    # Simple 1D airfoil model
-    # Specify polar parameters
 
     # Create airfoil model
     airfoil_model = NACA4412MLAirfoilModel()
@@ -821,7 +752,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
         num_radial=num_radial,
         num_azimuthal=num_azimuthal,
         num_blades=num_blades,
-        norm_hub_radius=0.2,
+        #norm_hub_radius=0.2,
     )
     # rotor analysis inputs
     inputs = RotorAnalysisInputs(
@@ -863,7 +794,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
 
     #This is how the trim residual is set.
     accel_norm_cruise.set_as_constraint(upper=0.1, lower=-0.1, scaler=10)
-        # Setting force equilibrium constraints
+    # Setting force equilibrium constraints
     force_norm = csdl.norm(total_forces_cruise)
     moment_norm = csdl.norm(total_moments_cruise)
 
@@ -884,32 +815,20 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     )
 
     #Static Margin
-    #assume neutral point at c/4 OR find the aerodynamic center and use that.
-    # constraining CG might be unnecessary
-    # CG = aircraft.quantities.mass_properties.cg_vector[0]
-    # wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
-    # CG.set_as_constraint(upper=wing_qc[0].value*0.95, lower=wing_qc[0].value*1.1, scaler=4)
+    #Static margin is covered in depth by longitudinal stability below:
 
-    # wing_cop = vlm_output.surface_cop[0][0][0]
-    # h_stab_cop = vlm_output.surface_cop[1][0][0]
-    # total_area = wing.parameters.S_ref + h_tail.parameters.S_ref
-    # total_cop = wing_cop * wing.parameters.S_ref / total_area + h_stab_cop * h_tail.parameters.S_ref / total_area
-    # b = csdl.sqrt(wing.parameters.AR*wing.parameters.S_ref) #ft #This should be a csdl variable at this point, check that.
-    # c = b/wing.parameters.AR #ft #This should be a csdl variable at this point, check that.
-    # # NP = c/4
-    # static_margin = (total_cop-CG)/c
-    # static_margin.set_as_constraint(upper=0.18,lower=0.2,scaler=5)
-    
-    # #Longitudinal dynamic stability THIS CAUSES ERROR
-    # t2d = long_stability_results.time_2_double_phugoid
-    # t2d.name = "time2double"
-    # #t2d.set_as_constraint()
-    # drph = long_stability_results.damping_ratio_phugoid
-    # drph.set_as_constraint(upper=0.045,lower=0.04,scaler=1/0.04)
+        
+    #According to  MIL 8785C.
+    #Longitudinal dynamic stability. Seeking level 1 classification.
+    drph = long_stability_results.damping_ratio_phugoid #Level 1
+    drph.set_as_constraint(lower=0.04,scaler=1/0.04)
     # drsp = long_stability_results.damping_ratio_short_period
-    # drsp.set_as_constraint(lower=0.7,upper=2,scaler=1/0.7)
-    
-    # mil 8785C find values for those things.
+    # drsp.set_as_constraint(lower=0.35,upper=1.3,scaler=1/0.35)
+
+    # #This ones a little harder to tell from the mil standard.
+    # nfsp = long_stability_results.nat_freq_short_period
+    # nfsp.set_as_constraint(lower = 6,scaler = 1/6)
+
 
     ########### Mission Power Analysis
     cruise_velocity = cruise.parameters.speed
@@ -921,12 +840,6 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     
     ER = energy/R
     ER.name = "E/R"
-
-    #Davids wing weight model testing stuff
-    # aircraft = caddee.base_configuration.system
-    # wing = aircraft.comps["wing"]
-    #weight = wing_weight_model(wing.parameters.AR,wing.parameters.S_ref,csdl.Variable(value=4),csdl.Variable(value=4),csdl.Variable(value=12),csdl.Variable(value=0.2))
-    #print(f"The calculated wing weight is {weight}")
 
     #SET AS OBJECTIVE
     ER.set_as_objective(scaler=1/21) 
