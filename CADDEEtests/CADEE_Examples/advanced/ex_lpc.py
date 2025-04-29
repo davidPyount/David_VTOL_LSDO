@@ -15,35 +15,35 @@ from lsdo_acoustics import Acoustics
 from lsdo_airfoil.core.three_d_airfoil_aero_model import ThreeDAirfoilMLModelMaker
 import lsdo_function_spaces as lfs
 import aframe as af
-#from ex_lpc_materials import construct_bay_condition, construct_thickness_function
+from ex_utils import construct_bay_condition, construct_thickness_function
 import aeroelastic_coupling_utils as acu
 import pickle
 
 
 print_dvs = True
 
-# with open("lpc_dv_dict_full_opt.pickle", "rb") as file:
-#     dv_dict_full_opt = pickle.load(file)
+with open("lpc_dv_dict_full_opt.pickle", "rb") as file:
+    dv_dict_full_opt = pickle.load(file)
 
-# with open("lpc_dv_dict_trim_opt.pickle", "rb") as file:
-#     dv_dict_trim_opt = pickle.load(file)
+with open("lpc_dv_dict_trim_opt.pickle", "rb") as file:
+    dv_dict_trim_opt = pickle.load(file)
 
-# if print_dvs:
-#     for key, value in dv_dict_full_opt.items():
-#         print(key, value)
-#         print("\n")
-#     for key, value in dv_dict_trim_opt.items():
-#         print(key, value)
-#         print("\n")
+if print_dvs:
+    for key, value in dv_dict_full_opt.items():
+        print(key, value)
+        print("\n")
+    for key, value in dv_dict_trim_opt.items():
+        print(key, value)
+        print("\n")
 
 
-# with open("lpc_constraints_dict_full_opt.pickle", "rb") as file:
-#     c_dict = pickle.load(file)
+with open("lpc_constraints_dict_full_opt.pickle", "rb") as file:
+    c_dict = pickle.load(file)
 
-# if print_dvs:
-#     for key, value in c_dict.items():
-#         print(key, value)
-#         print("\n")
+if print_dvs:
+    for key, value in c_dict.items():
+        print(key, value)
+        print("\n")
 
 max_stress = 350E6 # Pa
 max_displacement = 0.33 # m
@@ -54,11 +54,11 @@ do_qst = False
 vectorize_qst = True
 
 do_hover = True
-do_acoustics = False
+do_acoustics = True
 
 do_cruise = True
-do_climb = False
-do_descent = False
+do_climb = True
+do_descent = True
 
 do_structural_sizing = True
 do_oei = False
@@ -132,10 +132,10 @@ def define_base_config(caddee : cd.CADDEE):
     else:
         add_dvs = False
 
-    # construct_thickness_function(
-    #     wing=wing, num_ribs=num_ribs, top_array=top_array, bottom_array=bottom_array, material=aluminum, 
-    #     initial_thickness=initial_thickness, minimum_thickness=minimum_thickness, dv_dict=dv_dict_full_opt, add_dvs=add_dvs,
-    # )
+    construct_thickness_function(
+        wing=wing, num_ribs=num_ribs, top_array=top_array, bottom_array=bottom_array, material=aluminum, 
+        initial_thickness=initial_thickness, minimum_thickness=minimum_thickness, dv_dict=dv_dict_full_opt, add_dvs=add_dvs,
+    )
     
     # Function spaces
     # Thickness
@@ -1186,8 +1186,8 @@ def define_plus_3g(plus_3g):
 
     # total forces and moments
     total_forces_plus_3g, total_moments_plus_3g = plus_3g.assemble_forces_and_moments(
-        aero_propulsive_forces=[vlm_forces, drag_build_up,], 
-        aero_propulsive_moments=[vlm_moments], 
+        aero_propulsive_forces=[vlm_forces, drag_build_up, bem_outputs.forces], 
+        aero_propulsive_moments=[vlm_moments, bem_outputs.moments], 
         load_factor=3,
     )
 
@@ -1349,8 +1349,8 @@ def define_minus_1g(minus_1g):
 
     # total forces and moments
     total_forces_minus_1g, total_moments_minus_1g = minus_1g.assemble_forces_and_moments(
-        aero_propulsive_forces=[vlm_forces, drag_build_up], 
-        aero_propulsive_moments=[vlm_moments], 
+        aero_propulsive_forces=[vlm_forces, drag_build_up, bem_outputs.forces], 
+        aero_propulsive_moments=[vlm_moments, bem_outputs.moments], 
         load_factor=-1,
     )
 
@@ -2303,3 +2303,284 @@ for c in constraint_dict.keys():
 exit()
 
 
+# ::::::::::::::::::::::::::::::::::::PySim::::::::::::::::::::::::::::::::::::
+# total_forces [[-4.97112674  0.02406187 -9.51770693]]
+# total_moments [[  0.51460276 -24.35518937   0.66755083]]
+
+
+# du_dt [-0.00112339]
+# dv_dt [0.00021442]
+# dw_dt [-0.00317855]
+# dp_dt [3.82166697e-05]
+# dq_dt [0.00016413]
+# dr_dt [7.97913106e-05]
+
+
+# [0.05170884]
+# [-0.03332447]
+# [1858.4147944]
+    
+
+
+# ::::::::::::::::::::::::::::::::::::JAXSim GPU (torch cpu) run 1::::::::::::::::::::::::::::::::::::
+# total_forces [[ 1.10272070e+02  2.49237931e-02 -6.00345138e+02]]
+# total_moments [[ 5.33619742e-01 -2.08330948e+03  6.90579867e-01]]
+
+
+# du_dt [-0.07829857]
+# dv_dt [0.00022122]
+# dw_dt [0.0715057]
+# dp_dt [3.97731993e-05]
+# dq_dt [-0.07118617]
+# dr_dt [8.24702433e-05]
+
+
+# [0.05461365]
+# [-0.03775286]
+# [1866.82700542]
+    
+# ::::::::::::::::::::::::::::::::::::JAXSim GPU (torch cpu) run 2::::::::::::::::::::::::::::::::::::
+# total time 4.849106550216675
+# total_forces [[ 1.91832639e+02  2.44923702e-02 -2.74584511e+02]]
+# total_moments [[ 5.24149543e-01 -1.17848826e+03  6.78327571e-01]]
+
+
+# du_dt [0.01511043]
+# dv_dt [0.00021732]
+# dw_dt [0.00686962]
+# dp_dt [3.90614933e-05]
+# dq_dt [-0.02481406]
+# dr_dt [8.10108873e-05]
+
+
+# [0.05317487]
+# [-0.0362718]
+
+
+# ::::::::::::::::::::::::::::::::::::JAXSim CPU run 1::::::::::::::::::::::::::::::::::::
+# total_forces [[-8.98941318e+00  2.40175509e-02  2.41861932e+01]]
+# total_moments [[  0.51363152 103.36185926   0.66627966]]
+
+
+# du_dt [-0.01356258]
+# dv_dt [0.00021401]
+# dw_dt [0.03086753]
+# dp_dt [3.81444251e-05]
+# dq_dt [-0.0072491]
+# dr_dt [7.96403213e-05]
+
+
+# [0.0515592]
+# [-0.03318248]
+# [1858.11727248]
+
+
+# ::::::::::::::::::::::::::::::::::::JAXSim CPU run 2::::::::::::::::::::::::::::::::::::
+# total_forces [[-8.98941318e+00  2.40175509e-02  2.41861932e+01]]
+# total_moments [[  0.51363152 103.36185926   0.66627966]]
+
+
+# du_dt [-0.01356258]
+# dv_dt [0.00021401]
+# dw_dt [0.03086753]
+# dp_dt [3.81444251e-05]
+# dq_dt [-0.0072491]
+# dr_dt [7.96403213e-05]
+
+
+# [0.0515592]
+# [-0.03318248]
+# [1858.11727248]
+
+
+
+#          ==============
+#          Scipy summary:
+#          ==============
+#          Problem                    : LPC_trim
+#          Solver                     : scipy_slsqp
+#          Success                    : True
+#          Message                    : Optimization terminated successfully
+#          Objective                  : 0.0002790552862106368
+#          Gradient norm              : 0.7409795232014156
+#          Total time                 : 244.7714831829071
+#          Major iterations           : 17
+#          Total function evals       : 52
+#          Total gradient evals       : 17
+#          ==================================================
+# /home/marius/Desktop/packages/lsdo_lab/CSDL_alpha/csdl_alpha/src/operations/division.py:19: RuntimeWarning: divide by zero encountered in divide
+#   return x/y
+# nonlinear solver: bracketed_search converged in 42 iterations.
+# nonlinear solver: bracketed_search converged in 34 iterations.
+# total_forces [[-3.22678579  0.02405088 -0.97092618]]
+# total_moments [[0.51436201 1.37619778 0.66722884]]
+
+
+# du_dt [-0.00050072]
+# dv_dt [0.00021431]
+# dw_dt [-0.00112254]
+# dp_dt [3.81993796e-05]
+# dq_dt [0.00025605]
+# dr_dt [7.97526367e-05]
+
+
+# [0.05167176]
+# [-0.03329087]
+# [1858.53207306]
+
+
+#   ==============
+#          Scipy summary:
+#          ==============
+#          Problem                    : LPC_trim
+#          Solver                     : scipy_slsqp
+#          Success                    : True
+#          Message                    : Optimization terminated successfully
+#          Objective                  : 0.0002790552862106368
+#          Gradient norm              : 0.7409795232014156
+#          Total time                 : 247.31665658950806
+#          Major iterations           : 17
+#          Total function evals       : 52
+#          Total gradient evals       : 17
+#          ==================================================
+# /home/marius/Desktop/packages/lsdo_lab/CSDL_alpha/csdl_alpha/src/operations/division.py:19: RuntimeWarning: divide by zero encountered in divide
+#   return x/y
+# nonlinear solver: bracketed_search converged in 42 iterations.
+# nonlinear solver: bracketed_search converged in 34 iterations.
+# total_forces [[-3.22678579  0.02405088 -0.97092618]]
+# total_moments [[0.51436201 1.37619778 0.66722884]]
+
+
+# du_dt [-0.00050072]
+# dv_dt [0.00021431]
+# dw_dt [-0.00112254]
+# dp_dt [3.81993796e-05]
+# dq_dt [0.00025605]
+# dr_dt [7.97526367e-05]
+
+
+# [0.05167176]
+# [-0.03329087]
+# 1858.53207306
+
+
+
+
+# total_forces [[-1.13285697e+02  2.40383106e-02  4.95744642e+00]]
+# total_moments [[  0.51409049 313.98250329   0.66681587]]
+
+
+# du_dt [-0.18529727]
+# dv_dt [0.0002142]
+# dw_dt [0.33750011]
+# dp_dt [3.81802194e-05]
+# dq_dt [-0.10076421]
+# dr_dt [7.97095103e-05]
+
+
+# [0.05163007]
+# [-0.03331046]
+# [1849.54752017]
+    
+
+# total_forces [[-1.34462168e+02  2.39919663e-02  3.38712928e+01]]
+# total_moments [[  0.51306434 440.0387343    0.66563708]]
+
+
+# du_dt [-0.18773904]
+# dv_dt [0.00021387]
+# dw_dt [0.33804439]
+# dp_dt [3.80910506e-05]
+# dq_dt [-0.0985313]
+# dr_dt [7.9575203e-05]
+
+
+# [0.05147152]
+# [-0.03299989]
+# [1847.84743352]
+    
+
+
+# :::::::::::::::::::::::::::::::::::::Operations count (w/ tail actuation) :::::::::::::::::::::::::::::::::::::
+# Reshape : 11713
+# BroadcastMult : 6979
+# GetVarIndex : 6911
+# Add : 5655
+# SetVarIndex : 4187
+# Neg : 3389
+# Mult : 2125
+# Loop : 2047
+# BroadcastSetIndex : 1921
+# RightBroadcastPower : 1562
+
+    
+
+
+# :::::::::::::::::::::::::::::::::::::Operations count (w/o tail actuation) :::::::::::::::::::::::::::::::::::::
+# Reshape : 6043
+# GetVarIndex : 2881
+# SetVarIndex : 2587
+# Loop : 2027
+# BroadcastMult : 1859
+# Mult : 1645
+# Add : 1455
+# RightBroadcastPower : 1392
+# Neg : 809
+# Sum : 663
+
+
+Reshape : 12353
+BroadcastMult : 6979
+GetVarIndex : 6911
+Add : 5655
+SetVarIndex : 3547
+Neg : 3389
+Mult : 2125
+Loop : 2047
+BroadcastSetIndex : 1921
+RightBroadcastPower : 1562
+
+
+Reshape : 11713
+BroadcastMult : 6979
+GetVarIndex : 6911
+Add : 5655
+SetVarIndex : 4187
+Neg : 3389
+Mult : 2125
+Loop : 2047
+BroadcastSetIndex : 1921
+RightBroadcastPower : 1562
+
+
+Reshape : 10429
+GetVarIndex : 6055
+BroadcastMult : 5695
+Add : 5655
+Neg : 3389
+Mult : 2125
+SetVarIndex : 2051
+Loop : 2047
+BroadcastSetIndex : 1921
+
+Reshape : 5479
+GetVarIndex : 2465
+Loop : 2047
+Add : 1755
+SetVarIndex : 1751
+Mult : 1675
+RightBroadcastPower : 1412
+Neg : 989
+BroadcastMult : 895
+Sum : 683
+
+Reshape : 4939
+GetVarIndex : 2465
+Loop : 2047
+Add : 1755
+SetVarIndex : 1751
+Mult : 1567
+Neg : 989
+RightBroadcastPower : 980
+BroadcastMult : 787
+Sum : 683

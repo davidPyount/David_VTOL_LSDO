@@ -470,8 +470,8 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_outputs):
         wing.quantities.mass_properties.cg_vector = 0.56 * wing.LE_center + 0.44 * wing.TE_center # CG is around 44.4% of chord for 4412
 
 
-    beam_radius, beam_ID_radius, wing_spars_mass = run_beam(caddee:=caddee, vlm_output=vlm_outputs)
-    # wing_spars_mass = csdl.Variable(value=0.15) #temp until run beam is working.
+    #beam_radius, beam_ID_radius, wing_spars_mass = run_beam(caddee:=caddee, vlm_output=vlm_outputs)
+    wing_spars_mass = csdl.Variable(value=0.15) #temp until run beam is working.
 
     wing_spars_mass = wing_spars_mass * 2
 
@@ -1005,6 +1005,9 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     # static_margin = (COP-CG)/c
     # static_margin.set_as_constraint(upper=0.15,lower=0.1,scaler=1e-1)
     
+    #Code up a vlm convergence.
+
+
     # #Longitudinal dynamic stability THIS CAUSES ERROR
     # t2d = long_stability_results.time_2_double_phugoid
     # t2d.name = "time2double"
