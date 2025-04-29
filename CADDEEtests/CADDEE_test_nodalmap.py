@@ -351,6 +351,8 @@ def define_base_config(caddee : cd.CADDEE):
     # h_tail_discretization._num_spanwise = h_tail_spanwise_panels
 
         # H-Tail 
+    
+
     tail_chord_surface = cd.mesh.make_vlm_surface(
         wing_comp=h_tail,
         num_chordwise=h_tail_chordwise_panels, 
