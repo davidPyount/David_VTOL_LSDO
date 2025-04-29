@@ -298,66 +298,6 @@ def define_base_config(caddee : cd.CADDEE):
 
     # wing mesh
     plotting = False
-    
-    # leading_edge_line_parametric = wing_geometry.project(np.linspace(np.array([x_wing_LE, -y_wing_LE, z_wing_LE + 0.1]), 
-    #                                np.array([x_wing_LE, y_wing_LE, z_wing_LE + 0.1]), wing_spanwise_nodes), 
-    #                                direction=np.array([0., 0., -1.]), grid_search_density_parameter=20., plot=plotting)
-    # trailing_edge_line_parametric = wing_geometry.project(np.linspace(np.array([x_wing_TE, -y_wing_LE, z_wing_LE + 0.1]),
-    #                                 np.array([x_wing_TE, y_wing_LE, z_wing_LE + 0.1]), wing_spanwise_nodes), 
-    #                                 direction=np.array([0., 0., -1.]), grid_search_density_parameter=20., plot=plotting)
-    # leading_edge_line = wing_geometry.evaluate(leading_edge_line_parametric)
-    # trailing_edge_line = wing_geometry.evaluate(trailing_edge_line_parametric)
-    # chord_surface = csdl.linear_combination(leading_edge_line, trailing_edge_line, wing_chordwise_nodes)
-    # wing_geometry_upper_surface_wireframe_parametric = wing_geometry.project(chord_surface.value.reshape(
-    #                                                   (wing_chordwise_nodes,wing_spanwise_nodes,3))+np.array([0., 0., -0.1]), 
-    #                                                    direction=np.array([0., 0., 1.]), plot=plotting, grid_search_density_parameter=10.)
-    # wing_geometry_lower_surface_wireframe_parametric = wing_geometry.project(chord_surface.value.reshape(
-    #                                                   (wing_chordwise_nodes,wing_spanwise_nodes,3))+np.array([0., 0., 0.1]), 
-    #                                                    direction=np.array([0., 0., -1.]), plot=plotting, grid_search_density_parameter=10.)
-    # upper_surface_wireframe = wing_geometry.evaluate(wing_geometry_upper_surface_wireframe_parametric)
-    # lower_surface_wireframe = wing_geometry.evaluate(wing_geometry_lower_surface_wireframe_parametric)
-    # wing_camber_surface = csdl.linear_combination(upper_surface_wireframe, lower_surface_wireframe, 1).reshape(
-    #                     (wing_chordwise_nodes, wing_spanwise_nodes, 3))
-    # wing_camber_surface = csdl.expand(wing_camber_surface, (1, wing_chordwise_nodes, wing_spanwise_nodes, 3), 'ijk->aijk')
-    # wing_geometry.plot_meshes([wing_camber_surface])
-
-    # h-tail mesh
-    # leading_edge_line_parametric = h_tail_geometry.project(np.linspace(np.array([x_h_tail_LE, -y_h_tail_LE, z_h_tail_LE]), 
-    #                                np.array([x_h_tail_LE, y_h_tail_LE, z_h_tail_LE]), tail_spanwise_nodes), direction=np.array([0., 0., -1.]), 
-    #                                grid_search_density_parameter=20.,plot=plotting)
-    # trailing_edge_line_parametric = h_tail_geometry.project(np.linspace(np.array([x_h_tail_TE, -y_h_tail_LE, z_h_tail_LE + 0.1]), 
-    #                                 np.array([x_h_tail_TE, y_h_tail_LE, z_h_tail_LE + 0.1]), tail_spanwise_nodes), 
-    #                                 direction=np.array([0., 0., -1.]), grid_search_density_parameter=20.,plot=plotting)
-    # leading_edge_line = h_tail_geometry.evaluate(leading_edge_line_parametric)
-    # trailing_edge_line = h_tail_geometry.evaluate(trailing_edge_line_parametric)
-    # chord_surface = csdl.linear_combination(leading_edge_line, trailing_edge_line, tail_chordwise_nodes)
-    # h_tail_geometry_upper_surface_wireframe_parametric = h_tail_geometry.project(chord_surface.value.reshape(
-    #                                                     (tail_chordwise_nodes,tail_spanwise_nodes,3))+np.array([0., 0., -0.1]), 
-    #                                                     direction=np.array([0., 0., 1.]), plot=plotting, grid_search_density_parameter=10.)
-    # h_tail_geometry_lower_surface_wireframe_parametric = h_tail_geometry.project(chord_surface.value.reshape(
-    #                                                     (tail_chordwise_nodes,tail_spanwise_nodes,3))+np.array([0., 0., 0.1]), 
-    #                                                     direction=np.array([0., 0., -1.]), plot=plotting, grid_search_density_parameter=10.)
-    # upper_surface_wireframe = h_tail_geometry.evaluate(h_tail_geometry_upper_surface_wireframe_parametric)
-    # lower_surface_wireframe = h_tail_geometry.evaluate(h_tail_geometry_lower_surface_wireframe_parametric)
-    # h_tail_camber_surface = csdl.linear_combination(upper_surface_wireframe, lower_surface_wireframe, 1).reshape(
-    #                         (tail_chordwise_nodes, tail_spanwise_nodes, 3))
-    # h_tail_camber_surface = csdl.expand(h_tail_camber_surface, (1, tail_chordwise_nodes, tail_spanwise_nodes, 3), 'ijk->aijk')
-    # h_tail_geometry.plot_meshes([h_tail_camber_surface])
-
-    # nodal coords look good here (no extra row of zeros)
-    # wing_discretization = CamberSurface(nodal_coordinates = wing_camber_surface)
-    # wing_discretization._upper_wireframe_para = wing_geometry_upper_surface_wireframe_parametric
-    # wing_discretization._lower_wireframe_para = wing_geometry_lower_surface_wireframe_parametric
-    # wing_discretization._geom = wing_geometry
-    # wing_discretization._num_chord_wise = wing_chordwise_panels
-    # wing_discretization._num_spanwise = wing_spanwise_panels
-
-    # h_tail_discretization = CamberSurface(nodal_coordinates = h_tail_camber_surface)
-    # h_tail_discretization._upper_wireframe_para = h_tail_geometry_upper_surface_wireframe_parametric
-    # h_tail_discretization._lower_wireframe_para = h_tail_geometry_lower_surface_wireframe_parametric
-    # h_tail_discretization._geom = h_tail_geometry
-    # h_tail_discretization._num_chord_wise = h_tail_chordwise_panels
-    # h_tail_discretization._num_spanwise = h_tail_spanwise_panels
 
     # confirm that mesh is being generated properly. I changed a setting in meshers.py (lines 305, 634, 701))
 
@@ -403,7 +343,7 @@ def define_base_config(caddee : cd.CADDEE):
 
     # Set up the geometry: this will run the inner optimization
     # !! uncomment this during real run, comment out to check initial setup
-    # base_config.setup_geometry(plot=False)
+    base_config.setup_geometry(plot=False)
           
     # Assign base configuration to CADDEE instance
     caddee.base_configuration = base_config
@@ -462,7 +402,8 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     battery_position = csdl.Variable(name="battery_position", value=np.zeros(3))
     battery_position = battery_position.set(csdl.slice[0],battery_x)
     battery.quantities.mass_properties.cg_vector = battery_position 
-    battery_x.set_as_design_variable(lower=-15*cd.Units.length.inch_to_m, upper=-5*cd.Units.length.inch_to_m, scaler=5)
+    battery_x.set_as_design_variable(lower=-15*cd.Units.length.inch_to_m, upper=0, scaler=5)
+    # battery_x.set_as_design_variable(lower=-15*cd.Units.length.inch_to_m, upper=-5*cd.Units.length.inch_to_m, scaler=5)
 
     wing : cd.aircraft.components.Wing = aircraft.comps["wing"]
     wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
@@ -775,7 +716,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
 
     beam_displacement = frame.displacement[beam.name]
     max_disp = csdl.norm(beam_displacement[-1])
-    displacement_limit = wing_span*0.025
+    displacement_limit = wing_span*0.05
     # displacement_limit = wing_span*0.07
     r = displacement_limit - max_disp
     r.set_as_constraint(equals=0, scaler = 1)
@@ -907,8 +848,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     # total forces and moments
     # !! added drag back in
     total_forces_cruise, total_moments_cruise = cruise.assemble_forces_and_moments(
-        [vlm_forces, bem_outputs.forces, drag], [vlm_moments, bem_outputs.moments] #removed drag_build_up
-    )
+        [vlm_forces, bem_outputs.forces, drag], [vlm_moments, bem_outputs.moments])
 
     # eom
     eom_model = cd.aircraft.models.eom.SixDofEulerFlatEarthModel()
@@ -922,7 +862,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     accel_norm_cruise.name = "cruise_trim"
 
     #This is how the trim residual is set.
-    # accel_norm_cruise.set_as_constraint(upper=0.1, lower=-0.1, scaler=10)
+    accel_norm_cruise.set_as_constraint(upper=0.1, lower=-0.1, scaler=10)
         # Setting force equilibrium constraints
     force_norm = csdl.norm(total_forces_cruise)
     moment_norm = csdl.norm(total_moments_cruise)
@@ -930,10 +870,10 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     force_norm.name = "total_forces_norm"
     moment_norm.name = "total_moments_norm"
 
-    force_norm.set_as_constraint(upper=0.1, lower=-0.1, scaler=10)
-    moment_norm.set_as_constraint(upper=0.1, lower=-0.1, scaler=10)
-    force_norm.set_as_constraint(equals=0, scaler=1e-4)
-    moment_norm.set_as_constraint(equals=0., scaler=1e-4)
+    # force_norm.set_as_constraint(upper=0.1, lower=-0.1, scaler=10)
+    # moment_norm.set_as_constraint(upper=0.1, lower=-0.1, scaler=10)
+    # force_norm.set_as_constraint(equals=0, scaler=1e-4)
+    # moment_norm.set_as_constraint(equals=0., scaler=1e-4)
 
     # Performing linearized stability analysis
     long_stability_results = cruise.perform_linear_stability_analysis(
@@ -1029,7 +969,7 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
     
     # !! comment out to check for issues with setup
     problem = CSDLAlphaProblem(problem_name="er_minimization", simulator=jax_sim)
-    optimizer = SLSQP(problem, solver_options={'maxiter': 1000, 'ftol': 1E-6}, turn_off_outputs=True)
+    optimizer = SLSQP(problem, solver_options={'maxiter': 700, 'ftol': 1E-6}, turn_off_outputs=True)
     #optimizer = SLSQP(problem=problem)
     # Solve optimization problem
     optimizer.solve()
@@ -1048,50 +988,3 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
 
     for obj in recorder.objectives.keys():
         print(obj.name, obj.value)
-
-           # cruise : cd.aircraft.conditions.CruiseCondition = conditions["cruise"]
-    # vlm_mesh = mesh_container["vlm_mesh"]
-    # wing_lattice = vlm_mesh.discretizations["wing_chord_surface"]
-
-    # wing_spanwise_vlm_forces = csdl.Variable(value=np.zeros((wing_spanwise_panels,3)))
-    # # this loop combines forces chordwise
-    # for i in csdl.frange(wing_chordwise_panels):
-    #     wing_spanwise_vlm_forces += vlm_output.surface_panel_forces[0][0][i]
-
-    # # 
-    # # num_chordwise_panels = vlm_output.surface_panel_force_points[0][0].shape[0]
-    # if wing_chordwise_panels % 2 == 0:
-    #     middle_index = int(wing_chordwise_panels/2 - 1) # there is a better way to do this
-    # else:
-    #     middle_index = int((wing_chordwise_panels - 1)/2)
-
-    # force_points = vlm_output.surface_panel_force_points[0][0][middle_index]
-
-    # num_nodes = 15 # trying to get this to not need to be equal to the number of VLM spanwise panels
-
-    # # num_nodes = force_points.shape[0]
-    # # beam_mesh = np.zeros((num_nodes, 3))
- 
-    # beam_mesh = csdl.Variable(value=np.zeros((num_nodes, 3)))
-    
-    # # beam_mesh = beam_mesh.set(csdl.slice[:,1], csdl.linear_combination(-wing_span/2, wing_span/2, num_nodes))
-    # beam_points = csdl.linear_combination(-wing_span/2, wing_span/2, num_nodes)
-
-
-
-    # for i in range(beam_points.shape[0]):
-    #     beam_mesh = beam_mesh.set(csdl.slice[i,1], beam_points[i])
-
-
-
-    # beam_mesh[:, 1]  = csdl.linear_combination(-wing_span/2, wing_span/2, num_nodes)
-
-    # loads = csdl.Variable(value=np.zeros((wing_spanwise_vlm_forces.shape[0], 6)))
-
-    # for j in range(3):
-    #     for i in csdl.frange(loads[:,0].shape[0]):
-    #         loads = loads.set(csdl.slice[i,j], wing_spanwise_vlm_forces[i,j])
-
-    # loads = 5 * loads / 2
-
-    # SF = 1.5
