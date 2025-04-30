@@ -349,7 +349,7 @@ def define_conditions(caddee: cd.CADDEE):
     base_config = caddee.base_configuration
 
     pitch_angle = csdl.Variable(name="pitch_angle", value=0)
-    pitch_angle.set_as_design_variable(upper=np.deg2rad(5), lower=np.deg2rad(-5), scaler=4)
+    pitch_angle.set_as_design_variable(upper=np.deg2rad(1), lower=np.deg2rad(-1), scaler=4)
 
     cruise = cd.aircraft.conditions.CruiseCondition(
         altitude=0,
@@ -385,7 +385,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     # these values need to be defined in terms of values passed into the wing component
     wing_span = csdl.sqrt(wing.parameters.AR * wing.parameters.S_ref)
     # wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=0.5) ########## Look into this
-    wing_span.set_as_constraint(upper = 10 * cd.Units.length.foot_to_m, scaler=0.5)
+    wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=0.5)
 
     beam_radius, beam_ID_radius = run_beam(caddee=caddee, vlm_output=vlm_output)
 
@@ -550,8 +550,21 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
 
     total_aircraft_mass = base_config.system.quantities.mass_properties.mass
     total_aircraft_mass.name = "total_aircraft_mass"
-    total_aircraft_mass.set_as_constraint(upper=6*cd.Units.mass.pound_to_kg, scaler=.3) #This will probably fail optimization still.
-    # total_aircraft_mass.set_as_constraint(upper=8*cd.Units.mass.pound_to_kg, scaler=.3) #This will probably fail optimization still.
+    total_aircraft_mass.set_as_constraint(upper=6*cd.Units.mass.pound_to_kg, scaler=.3)
+
+    #Torsional constraint
+    #Wing boom length is not changed by optimzer. Neither is boom placement from fuselage.
+    arm = wing_boom_len/2
+    total_aircraft_mass = base_config.system.quantities.mass_properties.mass
+    T = total_aircraft_mass * 9.8 * arm #This worst torsional load case assumes opposite diagonal lifting rotors are at full power and the other two are unpowered
+    G = csdl.Variable(value=1.9e9) #Pa
+    twist_permitted = csdl.Variable(value=np.deg2rad(180))
+    L = csdl.Variable(value=0.74168) #m Distance between boom mounts
+
+    torqueR = beam_radius**4 - beam_ID_radius**4 - 32/np.pi * (T*L)/(G*twist_permitted) #This must be 0 or greater for twist to be twist_permitted or lower.
+    torqueR.name = "Wing spar twist residual"
+    torqueR.set_as_constraint(lower=0,scaler=10)
+
 
     print(base_config.system.quantities.mass_properties.inertia_tensor.value)
 
@@ -816,14 +829,15 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
 
     #Static Margin
     #Static margin is covered in depth by longitudinal stability below:
-
         
     #According to  MIL 8785C.
-    #Longitudinal dynamic stability. Seeking level 1 classification.
+    ### Longitudinal dynamic stability. Seeking level 1 classification. ###
     drph = long_stability_results.damping_ratio_phugoid #Level 1
     drph.set_as_constraint(lower=0.04,scaler=1/0.04)
-    # drsp = long_stability_results.damping_ratio_short_period
-    # drsp.set_as_constraint(lower=0.35,upper=1.3,scaler=1/0.35)
+    drph.name = "Damping Ratio Phugoid"
+    drsp = long_stability_results.damping_ratio_short_period
+    #drsp.set_as_constraint(lower=0.2,upper=2,scaler=1/0.35)
+    drsp.name = "Damping ratio short period"
 
     # #This ones a little harder to tell from the mil standard.
     # nfsp = long_stability_results.nat_freq_short_period
@@ -853,10 +867,7 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
     caddee = cd.CADDEE()
 
     #Define configuration in CADDEE
-    # wing_nodes, h_tail_nodes = define_base_config(caddee=caddee)
-    # wing_camber_surface, h_tail_camber_surface = define_base_config(caddee=caddee)
     define_base_config(caddee=caddee)
-    # define_base_config(caddee=caddee)
 
     #Define flight regimes in CADDEE
     define_conditions(caddee=caddee)
@@ -891,6 +902,8 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
 
     # Plot geometry after optimization
     mark2_geom.plot(additional_plotting_elements=plotting_elements, opacity=0.5, color="#00629B")
+
+    print(f"The aircraft CG vector is {caddee.base_configuration.system.quantities.mass_properties.cg_vector.value}")
 
     # Print design variables, constraints, objectives after optimization
     for dv in recorder.design_variables.keys():
