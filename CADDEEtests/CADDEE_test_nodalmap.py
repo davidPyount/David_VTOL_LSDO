@@ -1,7 +1,6 @@
 import CADDEE_alpha as cd
 import csdl_alpha as csdl
 import numpy as np
-#from lsdo_airfoil.core.three_d_airfoil_aero_model import ThreeDAirfoilMLModelMaker
 from VortexAD.core.vlm.vlm_solver import vlm_solver
 from modopt import CSDLAlphaProblem, SLSQP
 from CADDEE_alpha.utils.units import Units
@@ -10,11 +9,8 @@ import lsdo_function_spaces as lfs
 import aframe as af
 import os #for relative path import
 from BladeAD.core.airfoil.ml_airfoil_models.NACA_4412.naca_4412_model import NACA4412MLAirfoilModel
-#from BladeAD.utils.parameterization import BsplineParameterization
 from BladeAD.core.BEM.bem_model import BEMModel
-#from BladeAD.core.pitt_peters.pitt_peters_model import PittPetersModel
 from BladeAD.utils.var_groups import RotorAnalysisInputs, RotorMeshParameters
-#from CADDEE_alpha.core.mesh.meshers import CamberSurface
 units = Units()
 
 # Start the CSDL recorder
@@ -28,6 +24,9 @@ mark2_geom = cd.import_geometry(filename)
 plotting_elements = mark2_geom.plot(show=False, opacity=0.5, color='#FFCD00')
 
 g = 9.81
+
+saved_things = {}
+
 
 # define INITIAL values for design parameters
 w_total = 6 * units.mass.pound_to_kg * g
@@ -168,13 +167,12 @@ def define_base_config(caddee : cd.CADDEE):
     geometry=fuselage_geometry,
     skip_ffd = True)
 
-    fuselage.quantities.drag_parameters.characteristic_length = fuselage_length
     aircraft.comps["fuselage"] = fuselage
     
     # Treating the main spar like a funky fresh fuselage. Its dimensions will change but those of the main fuselage will not
     main_spar_geometry = aircraft.create_subgeometry(search_names=["MainSpar"])
     main_spar_length = csdl.Variable(name="main_spar_length", value=main_spar_len)
-    main_spar_length.set_as_design_variable(lower=0.75*main_spar_len, upper=1.25*main_spar_len, scaler=1)
+    main_spar_length.set_as_design_variable(lower=0.8*main_spar_len, upper=1.5*main_spar_len, scaler=1)
     main_spar = cd.aircraft.components.Fuselage(
         length=main_spar_length, 
         max_height= 0.75 * units.length.inch_to_m,
@@ -197,8 +195,8 @@ def define_base_config(caddee : cd.CADDEE):
     wing_tip_twist = csdl.Variable(name="wing_tip_twist", value=np.deg2rad(1.5))
     
     # Set design variables for wing
-    aspect_ratio.set_as_design_variable(upper=1.5 * wing_AR, lower=0.75 * wing_AR, scaler=1/5)
-    wing_area.set_as_design_variable(upper=1.5 * wing_S, lower=0.75 * wing_S, scaler=4)
+    aspect_ratio.set_as_design_variable(upper=2 * wing_AR, lower=0.5 * wing_AR, scaler=1/5)
+    wing_area.set_as_design_variable(upper=1.5 * wing_S, lower=0.7 * wing_S, scaler=4)
     wing_root_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=4)
     wing_tip_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=4)
     
@@ -217,8 +215,8 @@ def define_base_config(caddee : cd.CADDEE):
     h_tail_root_twist = csdl.Variable(name="h_stab_root_twist", value=np.deg2rad(-1.5))
 
     # Set design variables for wing
-    h_tail_AR.set_as_design_variable(upper=1.5 * wing_AR, lower=0.6 * wing_AR, scaler=1/3)
-    h_tail_area.set_as_design_variable(lower=0.5 * h_stab_S, upper=1.5 * h_stab_S, scaler=20)
+    h_tail_AR.set_as_design_variable(upper=1.5 * h_stab_AR, lower=0.5 * h_stab_AR, scaler=1/3)
+    h_tail_area.set_as_design_variable(lower=0.8 * h_stab_S, upper=2.5 * h_stab_S, scaler=20)
     h_tail_root_twist.set_as_design_variable(upper=np.deg2rad(5), lower=np.deg2rad(-5), scaler=10)
 
     # Make horizontal tail geometry & component
@@ -251,6 +249,10 @@ def define_base_config(caddee : cd.CADDEE):
     aircraft.comps["nosecone"] = nosecone
 
     #Generic caddee componets that are used later in define_mass_properties
+
+    #Ballast
+    ballast = cd.Component()
+    aircraft.comps["ballast"] = ballast
 
     #Battery
     battery = cd.Component()
@@ -349,7 +351,7 @@ def define_conditions(caddee: cd.CADDEE):
     base_config = caddee.base_configuration
 
     pitch_angle = csdl.Variable(name="pitch_angle", value=0)
-    pitch_angle.set_as_design_variable(upper=np.deg2rad(1), lower=np.deg2rad(-1), scaler=4)
+    pitch_angle.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=4)
 
     cruise = cd.aircraft.conditions.CruiseCondition(
         altitude=0,
@@ -369,6 +371,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     conditions = caddee.conditions
     cruise : cd.aircraft.conditions.CruiseCondition = conditions["cruise"]
     
+    # Battery Mass Properties
     battery = aircraft.comps["battery"]
     battery_mass = csdl.Variable(name="battery_mass", value=m_battery)
     # position pulled from CAD
@@ -377,15 +380,25 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     battery_position = csdl.Variable(name="battery_position", value=np.zeros(3))
     battery_position = battery_position.set(csdl.slice[0],battery_x)
     battery.quantities.mass_properties.cg_vector = battery_position 
-    battery_x.set_as_design_variable(lower=-15*cd.Units.length.inch_to_m, upper=0, scaler=5)
-    # battery_x.set_as_design_variable(lower=-15*cd.Units.length.inch_to_m, upper=-5*cd.Units.length.inch_to_m, scaler=5)
+    battery_x.set_as_design_variable(lower=-15*cd.Units.length.inch_to_m, upper=-6*cd.Units.length.inch_to_m, scaler=5)
+
+    # Ballast Mass Properties !!!
+    ballast = aircraft.comps["ballast"]
+    ballast_mass = csdl.Variable(name="Ballast Mass",value = 1) #kg
+    ballast_mass.set_as_design_variable(lower = 0, upper = 20, scaler = 1/2)
+    ballast.quantities.mass_properties.mass = ballast_mass
+    ballast_x = csdl.Variable(name="Ballast x Pos",value = 0)
+    ballast_position = csdl.Variable(name="battery_position", value=np.zeros(3))
+    ballast_position = ballast_position.set(csdl.slice[0],ballast_x)
+    ballast_x.set_as_design_variable(lower = -15*cd.Units.length.inch_to_m, upper = 15*cd.Units.length.inch_to_m, scaler=5)
+    ballast.quantities.mass_properties.cg_vector = ballast_position 
 
     wing : cd.aircraft.components.Wing = aircraft.comps["wing"]
     wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
     # these values need to be defined in terms of values passed into the wing component
     wing_span = csdl.sqrt(wing.parameters.AR * wing.parameters.S_ref)
     # wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=0.5) ########## Look into this
-    wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=0.5)
+    wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=0.5) #!!!
 
     beam_radius, beam_ID_radius = run_beam(caddee=caddee, vlm_output=vlm_output)
 
@@ -550,20 +563,20 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
 
     total_aircraft_mass = base_config.system.quantities.mass_properties.mass
     total_aircraft_mass.name = "total_aircraft_mass"
-    total_aircraft_mass.set_as_constraint(upper=6*cd.Units.mass.pound_to_kg, scaler=.3)
+    total_aircraft_mass.set_as_constraint(upper=10*cd.Units.mass.pound_to_kg, scaler=.3) #!!!
 
     #Torsional constraint
     #Wing boom length is not changed by optimzer. Neither is boom placement from fuselage.
     arm = wing_boom_len/2
     total_aircraft_mass = base_config.system.quantities.mass_properties.mass
     T = total_aircraft_mass * 9.8 * arm #This worst torsional load case assumes opposite diagonal lifting rotors are at full power and the other two are unpowered
-    G = csdl.Variable(value=1.9e9) #Pa
+    G = csdl.Variable(value=1.9e9) #Pa, lower bound from internet, conservative estimate.
     twist_permitted = csdl.Variable(value=np.deg2rad(180))
     L = csdl.Variable(value=0.74168) #m Distance between boom mounts
 
     torqueR = beam_radius**4 - beam_ID_radius**4 - 32/np.pi * (T*L)/(G*twist_permitted) #This must be 0 or greater for twist to be twist_permitted or lower.
     torqueR.name = "Wing spar twist residual"
-    torqueR.set_as_constraint(lower=0,scaler=10)
+    #torqueR.set_as_constraint(lower=-1000000000,scaler=10)
 
 
     print(base_config.system.quantities.mass_properties.inertia_tensor.value)
@@ -747,11 +760,11 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
 
     # 3) Mesh velocity: vector of shape (num_nodes, 3) where each row is the 
     # free streamvelocity vector (u, v, w) at the rotor center
-    mesh_vel_np = np.zeros((num_nodes, 3))
-    mesh_vel_np[:, 0] = 21 # Free stream velocity in the x-direction in m/s (cruise velocity)
-    mesh_velocity = csdl.Variable(value=mesh_vel_np)
+    mesh_vel_np = csdl.Variable(value=np.zeros((num_nodes, 3)))
+    mesh_vel_np = mesh_vel_np.set(csdl.slice[:, 0],cruise.parameters.speed) # Free stream velocity in the x-direction in m/s (cruise velocity) !!!
+    mesh_velocity = mesh_vel_np #csdl.Variable(value=mesh_vel_np) silliness
     # Rotor speed in RPM
-    rpm = csdl.Variable(name="rpm", value=14000 * np.ones((num_nodes,)))
+    rpm = csdl.Variable(name="rpm", value=9000 * np.ones((num_nodes,)))
     rpm.set_as_design_variable(upper=14328,lower=999,scaler=1/14000)
 
     # 4) Assemble inputs
@@ -827,7 +840,6 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
         mass_properties=cruise_config.system.quantities.mass_properties,
     )
 
-    #Static Margin
     #Static margin is covered in depth by longitudinal stability below:
         
     #According to  MIL 8785C.
@@ -836,8 +848,12 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     drph.set_as_constraint(lower=0.04,scaler=1/0.04)
     drph.name = "Damping Ratio Phugoid"
     drsp = long_stability_results.damping_ratio_short_period
-    #drsp.set_as_constraint(lower=0.2,upper=2,scaler=1/0.35)
     drsp.name = "Damping ratio short period"
+    drsp.set_as_constraint(lower=0.1,upper=2,scaler=1/0.08)
+
+
+
+    saved_things["drsp"] = drsp
 
     # #This ones a little harder to tell from the mil standard.
     # nfsp = long_stability_results.nat_freq_short_period
@@ -893,7 +909,7 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
     
     # !! comment out to check for issues with setup
     problem = CSDLAlphaProblem(problem_name="er_minimization", simulator=jax_sim)
-    optimizer = SLSQP(problem, solver_options={'maxiter': 700, 'ftol': 1E-6}, turn_off_outputs=True)
+    optimizer = SLSQP(problem, solver_options={'maxiter': 3000, 'ftol': 1E-6}, turn_off_outputs=True)
     #optimizer = SLSQP(problem=problem)
     # Solve optimization problem
     optimizer.solve()
@@ -904,6 +920,8 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
     mark2_geom.plot(additional_plotting_elements=plotting_elements, opacity=0.5, color="#00629B")
 
     print(f"The aircraft CG vector is {caddee.base_configuration.system.quantities.mass_properties.cg_vector.value}")
+    dsrp = saved_things["drsp"]
+    print(f"The short period damping ratio is {dsrp.value}")
 
     # Print design variables, constraints, objectives after optimization
     for dv in recorder.design_variables.keys():
@@ -914,3 +932,5 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
 
     for obj in recorder.objectives.keys():
         print(obj.name, obj.value)
+
+    
