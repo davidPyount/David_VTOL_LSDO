@@ -702,6 +702,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
     displacement_limit = wing_span*0.05
     # displacement_limit = wing_span*0.07
     r = displacement_limit - max_disp
+    r.name = "Displacement Residual"
     r.set_as_constraint(equals=0, scaler = 1)
 
     # beam_def_mesh = beam_mesh + beam_displacement
@@ -821,6 +822,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
 
     #This is how the trim residual is set.
     accel_norm_cruise.set_as_constraint(upper=0.1, lower=-0.1, scaler=10)
+    accel_norm_cruise.name = "Acceleration Norm"
     # Setting force equilibrium constraints
     force_norm = csdl.norm(total_forces_cruise)
     moment_norm = csdl.norm(total_moments_cruise)
