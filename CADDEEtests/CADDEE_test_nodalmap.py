@@ -172,7 +172,7 @@ def define_base_config(caddee : cd.CADDEE):
     # Treating the main spar like a funky fresh fuselage. Its dimensions will change but those of the main fuselage will not
     main_spar_geometry = aircraft.create_subgeometry(search_names=["MainSpar"])
     main_spar_length = csdl.Variable(name="main_spar_length", value=main_spar_len)
-    main_spar_length.set_as_design_variable(lower=0.8*main_spar_len, upper=1.5*main_spar_len, scaler=1)
+    main_spar_length.set_as_design_variable(lower=0.8*main_spar_len, upper=1.4*main_spar_len, scaler=1)
     main_spar = cd.aircraft.components.Fuselage(
         length=main_spar_length, 
         max_height= 0.75 * units.length.inch_to_m,
@@ -215,8 +215,8 @@ def define_base_config(caddee : cd.CADDEE):
     h_tail_root_twist = csdl.Variable(name="h_stab_root_twist", value=np.deg2rad(-1.5))
 
     # Set design variables for wing
-    h_tail_AR.set_as_design_variable(upper=1.5 * h_stab_AR, lower=0.5 * h_stab_AR, scaler=1/3)
-    h_tail_area.set_as_design_variable(lower=0.8 * h_stab_S, upper=2.5 * h_stab_S, scaler=20)
+    h_tail_AR.set_as_design_variable(upper=1.5 * h_stab_AR, lower=0.8 * h_stab_AR, scaler=1/3)
+    h_tail_area.set_as_design_variable(lower=0.8 * h_stab_S, upper=1.5 * h_stab_S, scaler=20)
     h_tail_root_twist.set_as_design_variable(upper=np.deg2rad(5), lower=np.deg2rad(-5), scaler=10)
 
     # Make horizontal tail geometry & component
@@ -390,7 +390,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     ballast_x = csdl.Variable(name="Ballast x Pos",value = 0)
     ballast_position = csdl.Variable(name="battery_position", value=np.zeros(3))
     ballast_position = ballast_position.set(csdl.slice[0],ballast_x)
-    ballast_x.set_as_design_variable(lower = -15*cd.Units.length.inch_to_m, upper = 15*cd.Units.length.inch_to_m, scaler=5)
+    ballast_x.set_as_design_variable(lower = -15*cd.Units.length.inch_to_m, upper = 0*cd.Units.length.inch_to_m, scaler=5)
     ballast.quantities.mass_properties.cg_vector = ballast_position 
 
     wing : cd.aircraft.components.Wing = aircraft.comps["wing"]
@@ -398,7 +398,8 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     # these values need to be defined in terms of values passed into the wing component
     wing_span = csdl.sqrt(wing.parameters.AR * wing.parameters.S_ref)
     # wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=0.5) ########## Look into this
-    wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=0.5) #!!!
+    wing_span.name = "Wing Span"
+    wing_span.set_as_constraint(upper = 6 * cd.Units.length.foot_to_m, scaler=0.5)
 
     beam_radius, beam_ID_radius = run_beam(caddee=caddee, vlm_output=vlm_output)
 
