@@ -1058,9 +1058,9 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
 
     #indices
     iterationi = 6 #chordwise
-    starti = 4
+    starti = 10
     iterationj = 8 #spanwise
-    startj = 4
+    startj = 10
 
     #initialization
     total_force = np.zeros([starti+iterationi,startj+iterationj])
@@ -1110,17 +1110,18 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
 
     #total_force = np.random.random((10, 10))
 
-    # plt.imshow(total_force, cmap='viridis')
-    # plt.colorbar()
-    # plt.xlabel("Spanwise Panels")
-    # plt.ylabel("Chordwise Panels")
-    # plt.show()
+    plt.imshow(total_force, cmap='viridis')
+    plt.colorbar()
+    plt.xlabel("Spanwise Panels")
+    plt.ylabel("Chordwise Panels")
+    plt.title("VLM Total Force vs # Spanwise and # Chorwise Panels")
+    plt.show()
 
-    for j in range(startj,startj+iterationj-1):
-        plt.plot(np.linspace(0,starti+iterationi,np.size(total_force[:,j])),total_force[:,j])
-        plt.xlabel("Chordwise Panels")
-        plt.ylabel("Total Force")
-        plt.show
+    # for j in range(startj,startj+iterationj-1):
+    #     plt.plot(np.linspace(0,starti+iterationi,np.size(total_force[:,j])),total_force[:,j])
+    #     plt.xlabel("Chordwise Panels")
+    #     plt.ylabel("Total Force")
+    #     plt.show
 
 
 
