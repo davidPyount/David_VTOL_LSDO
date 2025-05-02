@@ -13,6 +13,9 @@ from BladeAD.core.BEM.bem_model import BEMModel
 from BladeAD.utils.var_groups import RotorAnalysisInputs, RotorMeshParameters
 units = Units()
 
+#Need to integrate seth's boom code
+
+
 # Start the CSDL recorder
 recorder = csdl.Recorder(inline=True, expand_ops=True)
 recorder.start()
@@ -95,7 +98,7 @@ main_spar_ID_val = 0.625 * units.length.inch_to_m
 wing_spar_density = 1435 # [kg/m^3]
 
 # wing booms
-wing_boom_len = 30 * units.length.inch_to_m
+wing_boom_len = 22 * units.length.inch_to_m
 wing_boom_OD = 0.75 * units.length.inch_to_m
 wing_boom_ID = 0.625 * units.length.inch_to_m
 
@@ -131,10 +134,10 @@ mach =cruise_v/sos
 density_foam = 36 # kg/m^3 according to updated weight from Madison
 
 # VLM nodes
-wing_chordwise_panels = 10
-wing_spanwise_panels = 10
+wing_chordwise_panels = 16
+wing_spanwise_panels = 20
 h_tail_chordwise_panels = 10
-h_tail_spanwise_panels = 10
+h_tail_spanwise_panels = 16
 
 if wing_spanwise_panels % 2 != 0:
     raise ValueError('sowwy! wing_spanwise_panels must be even')
@@ -193,21 +196,43 @@ def define_base_config(caddee : cd.CADDEE):
     wing_area = csdl.Variable(name="wing_area", value = wing_S)
     wing_root_twist = csdl.Variable(name="wing_root_twist", value=np.deg2rad(1.5))
     wing_tip_twist = csdl.Variable(name="wing_tip_twist", value=np.deg2rad(1.5))
+
     
     # Set design variables for wing
     aspect_ratio.set_as_design_variable(upper=2 * wing_AR, lower=0.5 * wing_AR, scaler=1/5)
     wing_area.set_as_design_variable(upper=1.5 * wing_S, lower=0.7 * wing_S, scaler=4)
-    wing_root_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=4)
+    #wing_root_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=4)
     wing_tip_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=4)
+
     
     wing = cd.aircraft.components.Wing(
         AR=aspect_ratio, S_ref=wing_area, 
         taper_ratio=wing_taper, root_twist_delta=wing_root_twist,
         tip_twist_delta=wing_tip_twist, geometry=wing_geometry
     )
+    #wing.parameters.x_location = wing_x_location #Is this garbage
+    #wing.TE_center[0].set_as_design_variable(upper = 0,lower = -35*cd.Units.length.inch_to_m, scaler = 1/10)
+
+    # wing.TE_center[0].set_as_design_variable(upper = -3*cd.Units.length.inch_to_m, lower = -30*cd.Units.length.inch_to_m, scaler = 1/5)
+    # wing.TE_center.name = "Wing TE Location"
 
     # Assign wing component to aircraft
     aircraft.comps["wing"] = wing    
+
+    # main_mount_len = 0.15
+    # main_mount_length = csdl.Variable(name="Wing Mount Length", value=main_mount_len)
+    # #main_mount_length.set_as_design_variable(lower=0, upper=6*main_spar_len, scaler=1)
+    # wing_mount_geometry = aircraft.create_subgeometry(search_names=["TRD"])
+    # wing_mount = cd.aircraft.components.Fuselage(
+    #     length = wing.parameters.S_ref/wing.parameters.AR,
+    #     max_height=0.05,
+    #     max_width=0.05,
+    #     geometry= wing_mount_geometry,
+    #     compute_surface_area = False
+        
+    # )
+    # aircraft.comps["wing mount"] = wing_mount
+
 
     #Making hstab parameters changeable.
     h_tail_AR = csdl.Variable(name="hstab_aspect_ratio", value=h_stab_AR)
@@ -266,11 +291,14 @@ def define_base_config(caddee : cd.CADDEE):
     skeleton = cd.Component()
     aircraft.comps["skeleton"] = skeleton
 
+
+    ## Boom Assemblies
     left_boom_assembly = cd.Component()
     aircraft.comps["left_boom_assembly"] = left_boom_assembly
 
     right_boom_assembly = cd.Component()
     aircraft.comps["right_boom_assembly"] = right_boom_assembly
+
 
     cruise_motor = cd.Component()
     aircraft.comps["cruise_motor"] = cruise_motor
@@ -282,13 +310,17 @@ def define_base_config(caddee : cd.CADDEE):
     aircraft.comps["tail_mount"] = tail_mount
 
     # Connect wing to fuselage at the quarter chord
-    base_config.connect_component_geometries(fuselage, wing, 0.75 * wing.LE_center + 0.25 * wing.TE_center)
+    #base_config.connect_component_geometries(fuselage, wing, 0.75 * wing.LE_center + 0.25 * wing.TE_center)
     # Connect h-tail to spar
     base_config.connect_component_geometries(main_spar, h_tail, main_spar.tail_point)
     # Connect main spar to fuselage
     base_config.connect_component_geometries(main_spar, fuselage, main_spar.nose_point)
     # connect fuselage to nosecone
     base_config.connect_component_geometries(fuselage, nosecone, fuselage.nose_point)
+    #CONNECT WINGMOUNT TO FUSELAGE
+    #base_config.connect_component_geometries(fuselage, wing_mount, )
+    #CONNECT WING TO WINGMOUNT
+    #base_config.connect_component_geometries(wing_mount,wing, 0.75 * wing.LE_center + 0.25 * wing.TE_center) !!!!
 
     # Meshing
     mesh_container = base_config.mesh_container
@@ -382,7 +414,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     battery.quantities.mass_properties.cg_vector = battery_position 
     battery_x.set_as_design_variable(lower=-15*cd.Units.length.inch_to_m, upper=-6*cd.Units.length.inch_to_m, scaler=5)
 
-    # Ballast Mass Properties !!!
+    # Ballast Mass Properties
     ballast = aircraft.comps["ballast"]
     ballast_mass = csdl.Variable(name="Ballast Mass",value = 1) #kg
     ballast_mass.set_as_design_variable(lower = 0, upper = 20, scaler = 1/2)
@@ -390,7 +422,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     ballast_x = csdl.Variable(name="Ballast x Pos",value = 0)
     ballast_position = csdl.Variable(name="battery_position", value=np.zeros(3))
     ballast_position = ballast_position.set(csdl.slice[0],ballast_x)
-    ballast_x.set_as_design_variable(lower = -15*cd.Units.length.inch_to_m, upper = 0*cd.Units.length.inch_to_m, scaler=5)
+    ballast_x.set_as_design_variable(lower = -30*cd.Units.length.inch_to_m, upper = 15*cd.Units.length.inch_to_m, scaler=5)
     ballast.quantities.mass_properties.cg_vector = ballast_position 
 
     wing : cd.aircraft.components.Wing = aircraft.comps["wing"]
@@ -431,6 +463,8 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
 
     wing_mass = wing_volume * density_foam
     wing.quantities.mass_properties.mass = wing_mass
+    #wing_x_location = wing.parameters.x_location
+
     wing.quantities.mass_properties.cg_vector = 0.56 * wing.LE_center + 0.44 * wing.TE_center # CG is around 44.4% of chord for 4412
 
 
@@ -508,7 +542,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     cruise_motor.quantities.mass_properties.mass = cruise_motor_mass
     cruise_motor.quantities.mass_properties.cg_vector = csdl.Variable(name="cruise_motor_cg", value = cruise_motor_CG)
 
-
+    half_boom_length = (wing_chord + lift_rotor_d*1.05)/2 #!!!!
     half_boom_length = wing_boom_len/2
     half_boom_volume = np.pi*((wing_boom_OD/2)**2 - (wing_boom_ID/2)**2) * half_boom_length
     # !! from Madison: 3/4 inch x 36in length carbon fiber tube = 86.4 g
@@ -518,6 +552,9 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     # half_boom_density = 0.054 * ftin3_2_kgm3 # ?? get from AFL
     half_boom_density = 596.7 # kg/m^3
     half_boom_mass = half_boom_volume * half_boom_density
+
+
+    #Consider allowing these to move to some extent.
 
     left_boom_assembly = aircraft.comps["left_boom_assembly"]
     left_boom_assembly_mass_val = wing_boom_mount_mass_val + (half_boom_mass + lift_motor_mass_val + lift_motor_mount_mass_val + lift_rotor_mass_val)*2
@@ -541,7 +578,6 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     main_spar_length = csdl.norm(main_spar.nose_point - main_spar.tail_point)
     main_spar_volume = np.pi*((main_spar_OD/2)**2 - (main_spar_ID/2)**2) * main_spar_length
     main_spar_mass = main_spar_density * main_spar_volume
-    # main_spar_mass = csdl.Variable(name="main_spar_mass", value = main_spar_mass)
     main_spar.quantities.mass_properties.mass = main_spar_mass
     main_spar.quantities.mass_properties.cg_vector = (main_spar.nose_point + main_spar.tail_point)/2
 
@@ -564,7 +600,7 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
 
     total_aircraft_mass = base_config.system.quantities.mass_properties.mass
     total_aircraft_mass.name = "total_aircraft_mass"
-    total_aircraft_mass.set_as_constraint(upper=10*cd.Units.mass.pound_to_kg, scaler=.3) #!!!
+    total_aircraft_mass.set_as_constraint(upper=6.5*cd.Units.mass.pound_to_kg, scaler=.3) 
 
     #Torsional constraint
     #Wing boom length is not changed by optimzer. Neither is boom placement from fuselage.
@@ -703,7 +739,7 @@ def run_beam(caddee: cd.CADDEE, vlm_output):
     # displacement_limit = wing_span*0.07
     r = displacement_limit - max_disp
     r.name = "Displacement Residual"
-    r.set_as_constraint(equals=0, scaler = 1)
+    r.set_as_constraint(upper=0.1,lower=-0.1, scaler = 10)
 
     # beam_def_mesh = beam_mesh + beam_displacement
     # beam_displacement.set_as_constraint(lower=-displacement_limit,upper=displacement_limit,scaler=1e-4)
@@ -763,7 +799,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     # 3) Mesh velocity: vector of shape (num_nodes, 3) where each row is the 
     # free streamvelocity vector (u, v, w) at the rotor center
     mesh_vel_np = csdl.Variable(value=np.zeros((num_nodes, 3)))
-    mesh_vel_np = mesh_vel_np.set(csdl.slice[:, 0],cruise.parameters.speed) # Free stream velocity in the x-direction in m/s (cruise velocity) !!!
+    mesh_vel_np = mesh_vel_np.set(csdl.slice[:, 0],cruise.parameters.speed) # Free stream velocity in the x-direction in m/s (cruise velocity)
     mesh_velocity = mesh_vel_np #csdl.Variable(value=mesh_vel_np) silliness
     # Rotor speed in RPM
     rpm = csdl.Variable(name="rpm", value=9000 * np.ones((num_nodes,)))
@@ -852,7 +888,7 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
     drph.name = "Damping Ratio Phugoid"
     drsp = long_stability_results.damping_ratio_short_period
     drsp.name = "Damping ratio short period"
-    drsp.set_as_constraint(lower=0.1,upper=2,scaler=1/0.08)
+    drsp.set_as_constraint(lower=0.2,upper=2,scaler=1/0.08)
 
 
 
@@ -912,7 +948,7 @@ if __name__ == "__main__": #I like doing this because it makes it clear where th
     
     # !! comment out to check for issues with setup
     problem = CSDLAlphaProblem(problem_name="er_minimization", simulator=jax_sim)
-    optimizer = SLSQP(problem, solver_options={'maxiter': 3000, 'ftol': 1E-6}, turn_off_outputs=True)
+    optimizer = SLSQP(problem, solver_options={'maxiter': 700, 'ftol': 1E-6}, turn_off_outputs=True)
     #optimizer = SLSQP(problem=problem)
     # Solve optimization problem
     optimizer.solve()
