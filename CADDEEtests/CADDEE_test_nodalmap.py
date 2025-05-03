@@ -197,7 +197,7 @@ def define_base_config(caddee : cd.CADDEE):
     # Set design variables for wing
     aspect_ratio.set_as_design_variable(upper=2 * wing_AR, lower=0.5 * wing_AR, scaler=1/5)
     wing_area.set_as_design_variable(upper=1.5 * wing_S, lower=0.7 * wing_S, scaler=4)
-    wing_root_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=4)
+    #wing_root_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=4)
     wing_tip_twist.set_as_design_variable(upper=np.deg2rad(10), lower=np.deg2rad(-10), scaler=4)
     
     wing = cd.aircraft.components.Wing(
