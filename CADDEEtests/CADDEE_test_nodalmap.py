@@ -32,7 +32,7 @@ saved_things = {}
 w_total = 6 * units.mass.pound_to_kg * g
 
 # fuselage
-fuselage_length = 1.25 * units.length.foot_to_m
+fuselage_length = 1.25 * units.length.foot_to_m * 2
 fuse_perim = 1.5 * units.length.foot_to_m
 fuse_h = 5/12 * units.length.foot_to_m
 fuse_w = 5/12 * units.length.foot_to_m
@@ -209,6 +209,21 @@ def define_base_config(caddee : cd.CADDEE):
     # Assign wing component to aircraft
     aircraft.comps["wing"] = wing    
 
+    main_mount_len = 0.15
+    main_mount_length = csdl.Variable(name="Wing Mount Length", value=main_mount_len)
+    #main_mount_length.set_as_design_variable(lower=0, upper=6*main_spar_len, scaler=1)
+    wing_mount_geometry = aircraft.create_subgeometry(search_names=["Turd"])
+    wing_mount = cd.aircraft.components.Fuselage(
+        length = main_mount_length, #wing.parameters.S_ref/wing.parameters.AR,
+        max_height=0.01,
+        max_width=0.05,
+        geometry= wing_mount_geometry,
+        compute_surface_area = False
+        
+    )
+    aircraft.comps["wing mount"] = wing_mount
+
+
     #Making hstab parameters changeable.
     h_tail_AR = csdl.Variable(name="hstab_aspect_ratio", value=h_stab_AR)
     h_tail_area = csdl.Variable(name="h_tail_area", value=h_stab_S)
@@ -282,13 +297,19 @@ def define_base_config(caddee : cd.CADDEE):
     aircraft.comps["tail_mount"] = tail_mount
 
     # Connect wing to fuselage at the quarter chord
-    base_config.connect_component_geometries(fuselage, wing, 0.75 * wing.LE_center + 0.25 * wing.TE_center)
+    #base_config.connect_component_geometries(fuselage, wing, 0.75 * wing.LE_center + 0.25 * wing.TE_center)
     # Connect h-tail to spar
     base_config.connect_component_geometries(main_spar, h_tail, main_spar.tail_point)
     # Connect main spar to fuselage
     base_config.connect_component_geometries(main_spar, fuselage, main_spar.nose_point)
     # connect fuselage to nosecone
     base_config.connect_component_geometries(fuselage, nosecone, fuselage.nose_point)
+
+    # #CONNECT WINGMOUNT TO FUSELAGE
+    # #base_config.connect_component_geometries(wing_mount,fuselage, wing_mount.nose_point)
+    # base_config.connect_component_geometries(fuselage,wing_mount, fuselage.nose_point)
+    # #CONNECT WING TO WINGMOUNT
+    # base_config.connect_component_geometries(wing_mount,wing,wing_mount.tail_point)
 
     # Meshing
     mesh_container = base_config.mesh_container
@@ -382,16 +403,16 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     battery.quantities.mass_properties.cg_vector = battery_position 
     battery_x.set_as_design_variable(lower=-15*cd.Units.length.inch_to_m, upper=-6*cd.Units.length.inch_to_m, scaler=5)
 
-    # Ballast Mass Properties !!!
-    ballast = aircraft.comps["ballast"]
-    ballast_mass = csdl.Variable(name="Ballast Mass",value = 1) #kg
-    ballast_mass.set_as_design_variable(lower = 0, upper = 20, scaler = 1/2)
-    ballast.quantities.mass_properties.mass = ballast_mass
-    ballast_x = csdl.Variable(name="Ballast x Pos",value = 0)
-    ballast_position = csdl.Variable(name="battery_position", value=np.zeros(3))
-    ballast_position = ballast_position.set(csdl.slice[0],ballast_x)
-    ballast_x.set_as_design_variable(lower = -15*cd.Units.length.inch_to_m, upper = 0*cd.Units.length.inch_to_m, scaler=5)
-    ballast.quantities.mass_properties.cg_vector = ballast_position 
+    # Ballast Mass Properties
+    # ballast = aircraft.comps["ballast"]
+    # ballast_mass = csdl.Variable(name="Ballast Mass",value = 1) #kg
+    # ballast_mass.set_as_design_variable(lower = 0, upper = 20, scaler = 1/2)
+    # ballast.quantities.mass_properties.mass = ballast_mass
+    # ballast_x = csdl.Variable(name="Ballast x Pos",value = 0)
+    # ballast_position = csdl.Variable(name="battery_position", value=np.zeros(3))
+    # ballast_position = ballast_position.set(csdl.slice[0],ballast_x)
+    # ballast_x.set_as_design_variable(lower = -15*cd.Units.length.inch_to_m, upper = 0*cd.Units.length.inch_to_m, scaler=5)
+    # ballast.quantities.mass_properties.cg_vector = ballast_position 
 
     wing : cd.aircraft.components.Wing = aircraft.comps["wing"]
     wing_qc = 0.75 * wing.LE_center + 0.25 * wing.TE_center
@@ -441,7 +462,10 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     fuselage_mass = fuse_volume * density_fuse_foam
     fuselage_mass = csdl.Variable(name="fuselage_mass", value = fuselage_mass)
     fuselage.quantities.mass_properties.mass = fuselage_mass
+    fuselage_x = csdl.Variable(name="Fuselage x Pos",value = fuse_CG[0])
     fuselage_position = csdl.Variable(name="fuselage_position", value=fuse_CG)
+    fuselage_position = fuselage_position.set(csdl.slice[0],fuselage_x)
+    fuselage_x.set_as_design_variable(upper = 10000*units.length.inch_to_m, lower = -30000*units.length.inch_to_m, scaler = 1/(20*units.length.inch_to_m))
     fuselage.quantities.mass_properties.cg_vector = fuselage_position
 
     h_tail : cd.aircraft.components.Wing = aircraft.comps["h_tail"]
@@ -500,13 +524,15 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
 
     skeleton_mass = csdl.Variable(name = "skeleton_mass", value = skeleton_mass_val)
     skeleton.quantities.mass_properties.mass = skeleton_mass
-    skeleton.quantities.mass_properties.cg_vector = csdl.Variable(name="skeleton_cg", value = skeleton_CG) 
+    #skeleton.quantities.mass_properties.cg_vector = csdl.Variable(name="skeleton_cg", value = skeleton_CG) 
+    skeleton.quantities.mass_properties.cg_vector = fuselage.nose_point+fuselage.tail_point/2+5*units.length.inch_to_m
 
     cruise_motor = aircraft.comps["cruise_motor"]
     # from https://www.cobramotorsusa.com/motors-2217-20.html
     cruise_motor_mass = csdl.Variable(name="cruise_motor_mass", value=cruise_motor_mass_val) 
     cruise_motor.quantities.mass_properties.mass = cruise_motor_mass
-    cruise_motor.quantities.mass_properties.cg_vector = csdl.Variable(name="cruise_motor_cg", value = cruise_motor_CG)
+    #cruise_motor.quantities.mass_properties.cg_vector = csdl.Variable(name="cruise_motor_cg", value = cruise_motor_CG)
+    cruise_motor.quantities.mass_properties.cg_vector = fuselage.nose_point
 
 
     half_boom_length = wing_boom_len/2
@@ -558,7 +584,9 @@ def define_mass_properties(caddee : cd.CADDEE,vlm_output):
     wing_fuse_mount_mass = csdl.Variable(name="wing_fuse_mount_mass", value = wing_fuse_mount_mass_val)
     # mass and CG pulled from CAD
     wing_fuse_mount.quantities.mass_properties.mass = wing_fuse_mount_mass
-    wing_fuse_mount.quantities.mass_properties.cg_vector = csdl.Variable(name="wing_fuse_mount_cg", value = wing_fuse_mount_CG)
+
+    #wing_fuse_mount.quantities.mass_properties.cg_vector = csdl.Variable(name="wing_fuse_mount_cg", value = wing_fuse_mount_CG) !!!!
+    wing_fuse_mount.quantities.mass_properties.cg_vector = fuselage.nose_point+fuselage.tail_point/2
 
     base_config.assemble_system_mass_properties(update_copies=True)
 
@@ -847,16 +875,16 @@ def define_analysis(caddee: cd.CADDEE, vlm_output):
         
     #According to  MIL 8785C.
     ### Longitudinal dynamic stability. Seeking level 1 classification. ###
-    drph = long_stability_results.damping_ratio_phugoid #Level 1
-    drph.set_as_constraint(lower=0.04,scaler=1/0.04)
-    drph.name = "Damping Ratio Phugoid"
-    drsp = long_stability_results.damping_ratio_short_period
-    drsp.name = "Damping ratio short period"
-    drsp.set_as_constraint(lower=0.1,upper=2,scaler=1/0.08)
+    # drph = long_stability_results.damping_ratio_phugoid #Level 1
+    # drph.set_as_constraint(lower=0.04,scaler=1/0.04)
+    # drph.name = "Damping Ratio Phugoid"
+    # drsp = long_stability_results.damping_ratio_short_period
+    # drsp.name = "Damping ratio short period"
+    # drsp.set_as_constraint(lower=0.1,upper=2,scaler=1/0.08)
 
 
 
-    saved_things["drsp"] = drsp
+    #saved_things["drsp"] = drsp
 
     # #This ones a little harder to tell from the mil standard.
     # nfsp = long_stability_results.nat_freq_short_period
